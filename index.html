@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MNR Productivity System - Dynamic Filtering</title>
+    
+    <!-- External Libraries for Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background-color: #f4f7f6; color: #333; }
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2c3e50; display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .login-box { background: white; padding: 40px; border-radius: 12px; width: 350px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .login-box input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        .login-box button { width: 100%; padding: 12px; background: #2980b9; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        #main-system { display: none; padding: 20px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h2 { font-style: italic; color: #2c3e50; border-bottom: 2px solid #2c3e50; margin: 0; }
+
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-box { background: white; padding: 15px; border-radius: 8px; border-left: 5px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .stat-box h4 { margin: 0; font-size: 10px; color: #7f8c8d; text-transform: uppercase; }
+        .stat-box .value { font-size: 22px; font-weight: bold; margin: 5px 0; }
+        .stat-box .perc { font-size: 11px; color: #95a5a6; font-weight: bold; }
+        .approved { border-left-color: #27ae60; } .repaired { border-left-color: #2980b9; }
+        .rem-app { border-left-color: #f39c12; } .rem-pend { border-left-color: #e74c3c; }
+        .damage { border-left-color: #8e44ad; } .available { border-left-color: #16a085; }
+
+        .tab-bar { display: flex; gap: 5px; }
+        .tab { padding: 10px 25px; cursor: pointer; background: #dcdde1; border-radius: 8px 8px 0 0; font-weight: bold; color: #7f8c8d; }
+        .tab.active { background: white; color: #2980b9; border-top: 4px solid #2980b9; }
+
+        .sheet-container { background: white; border: 1px solid #ccc; padding: 20px; border-radius: 0 8px 8px 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .controls-wrapper { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        
+        .filter-bar { display: flex; gap: 8px; align-items: center; background: #fff9c4; padding: 8px 15px; border-radius: 20px; border: 1px solid #fbc02d; font-size: 13px; }
+        .filter-bar select { padding: 4px; border-radius: 4px; border: 1px solid #ccc; }
+
+        .table-wrapper { overflow-x: auto; max-height: 500px; border: 1px solid #ddd; }
+        table { border-collapse: collapse; width: 100%; min-width: 1000px; }
+        th, td { border: 1px solid #ccc; padding: 8px; font-size: 12px; text-align: center; }
+        th { background-color: #fce4ad; position: sticky; top: 0; z-index: 10; }
+        td[contenteditable="true"] { background: white; outline: none; cursor: cell; }
+        td[contenteditable="true"]:focus { background: #fffde7; box-shadow: inset 0 0 5px rgba(0,0,0,0.1); }
+        td.selected { background-color: #e1f5fe !important; box-shadow: inset 0 0 0 2px #03a9f4; }
+        .readonly { background-color: #f9f9f9; color: #7f8c8d; }
+
+        .col-days-app { background-color: #daeef3 !important; color: #0070c0; font-weight: bold; }
+        .col-days-rep { background-color: #fde9d9 !important; color: #e26b0a; font-weight: bold; }
+
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; font-size: 12px; }
+        .btn-add { background: #34495e; } .btn-delete { background: #e74c3c; }
+        .btn-excel { background: #217346; } .btn-pdf { background: #c0392b; }
+        .btn-logout { background: #7f8c8d; }
+
+        .line-pane { display: none; }
+        .line-pane.active { display: block; }
+    </style>
+</head>
+<body>
+
+    <!-- Login Section -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2 style="margin-bottom:20px;">MNR LOGIN</h2>
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="checkLogin()">LOGIN</button>
+            <p id="error-msg" style="color:red; display:none; font-size:12px; margin-top:10px;">Invalid Username/Password!</p>
+        </div>
+    </div>
+
+    <!-- Main System -->
+    <div id="main-system">
+        <div class="header">
+            <h2>MNR PRODUCTIVITY REPORT</h2>
+            <button class="btn btn-logout" onclick="location.reload()">Logout</button>
+        </div>
+
+        <!-- Dashboard -->
+        <div class="dashboard">
+            <div class="stat-box approved"><h4>Approved (Filtered)</h4><div class="value" id="dash-app">0</div></div>
+            <div class="stat-box repaired"><h4>Repaired (Filtered)</h4><div class="value" id="dash-rep">0</div></div>
+            <div class="stat-box rem-app"><h4>Remaining App.</h4><div class="value" id="dash-rem-app">0</div></div>
+            <div class="stat-box rem-pend"><h4>Remaining Pend.</h4><div class="value" id="dash-rem-pend">0</div></div>
+            <div class="stat-box damage">
+                <h4>Total Damage</h4><div class="value" id="dash-damage">0</div>
+                <div class="perc" id="perc-damage">0%</div>
+            </div>
+            <div class="stat-box available">
+                <h4>Available</h4>
+                <input type="number" id="manual-avail" value="0" oninput="updateStats(); saveData();" style="width: 70%; border: none; font-size: 20px; font-weight: bold; outline: none; background: transparent;">
+                <div class="perc" id="perc-avail">0%</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-bar">
+            <div class="tab active" onclick="switchTab('MAERSK', this)">MAERSK</div>
+            <div class="tab" onclick="switchTab('ONE', this)">ONE</div>
+            <div class="tab" onclick="switchTab('CMA', this)">CMA</div>
+        </div>
+
+        <div class="sheet-container">
+            <div class="controls-wrapper">
+                <button class="btn btn-add" onclick="addNewRows(15)">+ Add 15 Rows</button>
+                <button class="btn btn-delete" onclick="deleteSelectedRows()">🗑 Delete</button>
+                
+                <!-- Filter Bar -->
+                <div class="filter-bar">
+                    <strong>FILTER:</strong>
+                    <select id="filter-type" onchange="applyFilters()">
+                        <option value="4">EOR DATE</option>
+                        <option value="5">APPROVAL</option>
+                        <option value="6">REPAIR</option>
+                    </select>
+                    <select id="filter-month" onchange="applyFilters()">
+                        <option value="">MONTH</option>
+                        <option value="EMPTY">[BLANK]</option>
+                        <option value="01">01 (Jan)</option><option value="02">02 (Feb)</option>
+                        <option value="03">03 (Mar)</option><option value="04">04 (Apr)</option>
+                        <option value="05">05 (May)</option><option value="06">06 (Jun)</option>
+                        <option value="07">07 (Jul)</option><option value="08">08 (Aug)</option>
+                        <option value="09">09 (Sep)</option><option value="10">10 (Oct)</option>
+                        <option value="11">11 (Nov)</option><option value="12">12 (Dec)</option>
+                    </select>
+                    <select id="filter-year" onchange="applyFilters()">
+                        <option value="">YEAR</option>
+                        <option value="24">2024</option><option value="25">2025</option><option value="26">2026</option>
+                    </select>
+                    <button onclick="clearFilters()" style="cursor:pointer; border:none; background:none; color:red; font-weight:bold;">[clear]</button>
+                </div>
+
+                <div style="margin-left:auto; display:flex; gap:5px;">
+                    <button class="btn btn-excel" onclick="exportExcel()">Export Excel</button>
+                    <button class="btn btn-pdf" onclick="exportPDF()">Export PDF</button>
+                </div>
+            </div>
+
+            <div id="MAERSK" class="line-pane active"></div>
+            <div id="ONE" class="line-pane"></div>
+            <div id="CMA" class="line-pane"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentLine = 'MAERSK';
+        let isMouseDown = false;
+        let startCell = null;
+
+        function checkLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            if(u === "admin" && p === "admin123") {
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('main-system').style.display = 'block';
+                loadData();
+            } else {
+                document.getElementById('error-msg').style.display = 'block';
+            }
+        }
+
+        ['MAERSK', 'ONE', 'CMA'].forEach(line => {
+            document.getElementById(line).innerHTML = `
+                <div class="table-wrapper">
+                    <table id="table-${line}">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" onclick="toggleAll(this, '${line}')"></th>
+                                <th>NO.</th><th>CNTR NO.</th><th>LINE</th><th>EOR DATE</th>
+                                <th>APPROVAL</th><th>REPAIR</th><th>TODAY</th>
+                                <th class="col-days-app">No. of Days to Approved</th><th class="col-days-rep">No. of Days to Repaired</th>
+                            </tr>
+                        </thead>
+                        <tbody id="body-${line}"></tbody>
+                    </table>
+                </div>`;
+        });
+
+        function createRow(line, data = null) {
+            const tbody = document.getElementById(`body-${line}`);
+            const tr = document.createElement('tr');
+            const today = new Date().toLocaleDateString('en-GB', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+            
+            tr.innerHTML = `
+                <td><input type="checkbox" class="row-check"></td>
+                <td class="readonly row-num"></td>
+                <td contenteditable="true">${data ? data[0] : ''}</td>
+                <td class="readonly">${line}</td>
+                <td contenteditable="true">${data ? data[1] : ''}</td>
+                <td contenteditable="true">${data ? data[2] : ''}</td>
+                <td contenteditable="true">${data ? data[3] : ''}</td>
+                <td class="readonly">${today}</td>
+                <td class="readonly col-days-app"></td>
+                <td class="readonly col-days-rep"></td>`;
+
+            Array.from(tr.cells).forEach(cell => {
+                if (cell.getAttribute('contenteditable')) {
+                    cell.addEventListener('mousedown', e => { 
+                        isMouseDown = true; startCell = cell; 
+                        if(!e.shiftKey) clearSelection(); 
+                        cell.classList.add('selected'); 
+                    });
+                    cell.addEventListener('mouseenter', () => { if(isMouseDown) dragSelect(cell); });
+                    cell.addEventListener('input', () => { updateStats(); saveData(); });
+                }
+            });
+            tbody.appendChild(tr);
+        }
+
+        function initRows(line, count) { for (let i = 0; i < count; i++) createRow(line); renumberRows(line); }
+
+        function renumberRows(line) {
+            document.querySelectorAll(`#body-${line} tr`).forEach((row, idx) => {
+                row.querySelector('.row-num').innerText = idx + 1;
+            });
+        }
+
+        function switchTab(line, btn) {
+            currentLine = line;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.line-pane').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active'); 
+            document.getElementById(line).classList.add('active');
+            updateStats();
+        }
+
+        function dragSelect(cell) {
+            clearSelection();
+            const table = cell.closest('table'), r1 = startCell.parentElement.rowIndex, r2 = cell.parentElement.rowIndex, c1 = startCell.cellIndex, c2 = cell.cellIndex;
+            for (let i = Math.min(r1, r2); i <= Math.max(r1, r2); i++) {
+                for (let j = Math.min(c1, c2); j <= Math.max(c1, c2); j++) {
+                    const target = table.rows[i].cells[j];
+                    if (target && target.getAttribute('contenteditable')) target.classList.add('selected');
+                }
+            }
+        }
+        function clearSelection() { document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected')); }
+        window.onmouseup = () => isMouseDown = false;
+
+        document.onpaste = (e) => {
+            const selected = document.querySelectorAll('.selected');
+            if (!selected.length) return;
+            e.preventDefault();
+            const rawData = (e.clipboardData || window.clipboardData).getData('text');
+            const rows = rawData.split(/\r?\n/).filter(r => r.trim() !== "");
+
+            if (rows.length === 1 && !rawData.includes('\t') && selected.length > 1) {
+                selected.forEach(cell => { if (cell.getAttribute('contenteditable')) cell.innerText = rawData.trim(); });
+            } else {
+                const table = selected[0].closest('table');
+                let sRow = selected[0].parentElement.rowIndex, sCol = selected[0].cellIndex;
+                rows.forEach((rText, rIdx) => {
+                    let tRow = table.rows[sRow + rIdx];
+                    if (!tRow) { createRow(currentLine); tRow = table.rows[sRow + rIdx]; renumberRows(currentLine); }
+                    rText.split('\t').forEach((cText, cIdx) => {
+                        let tCell = tRow.cells[sCol + cIdx];
+                        if (tCell && tCell.getAttribute('contenteditable')) tCell.innerText = cText.trim();
+                    });
+                });
+            }
+            updateStats(); saveData();
+        };
+
+        // --- UPDATED STATS LOGIC (DEPENDENT ON FILTER) ---
+function updateStats() {
+            const tbody = document.getElementById(`body-${currentLine}`), 
+                  rows = tbody.querySelectorAll('tr');
+            let app = 0, rep = 0, remA = 0, remP = 0, dmg = 0;
+
+            rows.forEach(row => {
+                // 1. IMPORTANTE: Laktawan ang calculation kung ang row ay tago (filtered out)
+                if (row.style.display === 'none') return;
+
+                const cntr = row.cells[2].innerText.trim();
+                const dStr = row.cells[4].innerText.trim(); // EOR Date
+                const aStr = row.cells[5].innerText.trim(); // Approval Date
+                const cStr = row.cells[6].innerText.trim(); // Repair Date
+                
+                const parseDate = (str) => {
+                    const p = str.split(/[-/ ]+/);
+                    if(p.length < 3) return new Date(NaN);
+                    return new Date(`20${p[2]}-${p[0]}-${p[1]}`); 
+                };
+
+                const dEor = parseDate(dStr), aEor = parseDate(aStr), cRep = parseDate(cStr);
+                const diff = (d1, d2) => (isNaN(d1) || isNaN(d2)) ? "" : Math.ceil((d1 - d2) / 86400000);
+                
+                // I-update ang Days calculation (UI only)
+                row.cells[8].innerText = diff(aEor, dEor);
+                row.cells[9].innerText = diff(cRep, aEor);
+
+                // 2. COUNTING LOGIC: Dito nagaganap ang SUM ng approved na "naka-show"
+                if (cntr) {
+                    dmg++; // Bilang ng lahat ng may Container No. na visible
+                    
+                    if (aStr !== "" && !isNaN(aEor)) { 
+                        app++; // Ito ang SUM ng lahat ng Approved sa filtered view
+                    }
+                    
+                    if (cStr !== "" && !isNaN(cRep)) {
+                        rep++; // SUM ng Repaired sa filtered view
+                    }
+
+                    // Remaining Approved (May approval pero wala pang repair date)
+                    if (aStr !== "" && !isNaN(aEor) && (cStr === "" || isNaN(cRep))) {
+                        remA++;
+                    }
+
+                    // Remaining Pending (May EOR date pero wala pang approval)
+                    if (dStr !== "" && !isNaN(dEor) && (aStr === "" || isNaN(aEor))) {
+                        remP++;
+                    }
+                }
+            });
+
+            // Update Dashboard UI
+            const manual = parseInt(document.getElementById('manual-avail').value) || 0;
+            const total = dmg + manual;
+            
+            document.getElementById('dash-app').innerText = app;
+            document.getElementById('dash-rep').innerText = rep;
+            document.getElementById('dash-rem-app').innerText = remA;
+            document.getElementById('dash-rem-pend').innerText = remP;
+            document.getElementById('dash-damage').innerText = dmg;
+            
+            document.getElementById('perc-damage').innerText = total > 0 ? ((dmg/total)*100).toFixed(1) + "%" : "0%";
+            document.getElementById('perc-avail').innerText = total > 0 ? ((manual/total)*100).toFixed(1) + "%" : "0%";
+        }
+
+function applyFilters() {
+    const colIndex = parseInt(document.getElementById('filter-type').value);
+    const selMonth = document.getElementById('filter-month').value;
+    const selYear = document.getElementById('filter-year').value;
+    const rows = document.querySelectorAll(`#body-${currentLine} tr`);
+
+    // KUNG BLANK ANG FILTERS, ITAGO LAHAT
+    if (selMonth === "" && selYear === "") {
+        rows.forEach(row => row.style.display = "none");
+        updateStats();
+        return;
+    }
+
+    rows.forEach(row => {
+        const cntrNo = row.cells[2].innerText.trim();
+        const dateText = row.cells[colIndex].innerText.trim();
+        let showRow = false; // Default to false
+
+        if (cntrNo) {
+            if (selMonth === "EMPTY") {
+                showRow = (dateText === "");
+            } else {
+                const parts = dateText.split(/[-/ ]+/); 
+                const rowMonth = parts[0] ? parts[0].padStart(2, '0') : "";
+                const rowYear = parts[2] ? parts[2].slice(-2) : "";
+                
+                const monthMatch = (selMonth === "") || (rowMonth === selMonth);
+                const yearMatch = (selYear === "") || (rowYear === selYear);
+                
+                showRow = monthMatch && yearMatch;
+            }
+        }
+        row.style.display = showRow ? "" : "none";
+    });
+    updateStats();
+}
+
+        function clearFilters() {
+            document.getElementById('filter-month').value = "";
+            document.getElementById('filter-year').value = "";
+            applyFilters();
+        }
+
+        function saveData() {
+            const allData = {};
+            ['MAERSK', 'ONE', 'CMA'].forEach(line => {
+                const rows = [];
+                document.querySelectorAll(`#body-${line} tr`).forEach(tr => {
+                    const rowData = [tr.cells[2].innerText, tr.cells[4].innerText, tr.cells[5].innerText, tr.cells[6].innerText];
+                    if (rowData.some(t => t.trim() !== "")) rows.push(rowData);
+                });
+                allData[line] = rows;
+            });
+            localStorage.setItem('mnr_data_v2', JSON.stringify(allData));
+            localStorage.setItem('mnr_avail_v2', document.getElementById('manual-avail').value);
+        }
+
+function loadData() {
+    const saved = localStorage.getItem('mnr_data_v2');
+    const avail = localStorage.getItem('mnr_avail_v2');
+    if (avail) document.getElementById('manual-avail').value = avail;
+    
+    ['MAERSK', 'ONE', 'CMA'].forEach(line => {
+        const tbody = document.getElementById(`body-${line}`);
+        tbody.innerHTML = "";
+        
+        if (saved) {
+            const data = JSON.parse(saved)[line] || [];
+            // I-load ang mga saved data
+            data.forEach(rowData => createRow(line, rowData));
+            // Siguraduhin na may minimum na 15 rows
+            if (data.length < 15) {
+                initRows(line, 15 - data.length);
+            }
+        } else {
+            // Kung fresh start, 15 rows agad
+            initRows(line, 15);
+        }
+
+        // SIGURADUHIN NA MAY NUMBERING:
+        renumberRows(line);
+
+        // INITIAL VIEW: Ipakita lang ang index 0-14 (1st 15 rows)
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach((row, index) => {
+            if (index < 15) {
+                row.style.display = ''; 
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+    
+    // I-reset ang filter selection sa UI
+    document.getElementById('filter-month').value = "";
+    document.getElementById('filter-year').value = "";
+    
+    updateStats(); 
+}
+
+        function addNewRows(n) { initRows(currentLine, n); updateStats(); }
+
+function deleteSelectedRows() {
+    // Kukunin lang natin ang mga checkboxes na naka-check 
+    // AT ang row nila ay kasalukuyang NAKAPAKITA (style.display !== 'none')
+    const allChecked = document.querySelectorAll(`#body-${currentLine} .row-check:checked`);
+    const visibleChecked = Array.from(allChecked).filter(cb => {
+        return cb.closest('tr').style.display !== 'none';
+    });
+
+    if (visibleChecked.length === 0) {
+        alert("No visible rows selected to delete.");
+        return;
+    }
+
+    if (confirm(`Delete ${visibleChecked.length} visible rows?`)) {
+        visibleChecked.forEach(cb => cb.closest('tr').remove());
+        renumberRows(currentLine); 
+        updateStats(); 
+        saveData();
+    }
+}
+
+function toggleAll(master, line) {
+    document.querySelectorAll(`#body-${line} tr`).forEach(row => {
+        // I-check o i-uncheck lang ang row kung ito ay NAKASHOW
+        if (row.style.display !== 'none') {
+            const cb = row.querySelector('.row-check');
+            if (cb) cb.checked = master.checked;
+        }
+    });
+}
+function exportExcel() {
+    // 1. Kunin ang Stats para sa Header ng Excel
+    const stats = [
+        ["MNR PRODUCTIVITY SUMMARY REPORT - " + currentLine],
+        ["Date Exported:", new Date().toLocaleString()],
+        ["Approved Count:", document.getElementById('dash-app').innerText],
+        ["Repaired Count:", document.getElementById('dash-rep').innerText],
+        ["Total Damage:", document.getElementById('dash-damage').innerText],
+        [""], // Blank space
+        ["NO.", "CNTR NO.", "LINE", "EOR DATE", "APPROVAL", "REPAIR", "TODAY", "DAYS APP", "DAYS REP"] // Headers
+    ];
+
+    // 2. Kunin lang ang mga rows na NAKASHOW (Visible) at MAY LAMAN na Container No.
+    const tbody = document.getElementById(`body-${currentLine}`);
+    const rows = tbody.querySelectorAll("tr");
+
+    rows.forEach(tr => {
+        const cntrNo = tr.cells[2].innerText.trim();
+        // Check kung visible ang row AT may container number
+        if (tr.style.display !== 'none' && cntrNo !== "") {
+            const rowData = [
+                tr.cells[1].innerText, // NO.
+                cntrNo,                // CNTR NO.
+                tr.cells[3].innerText, // LINE
+                tr.cells[4].innerText, // EOR DATE
+                tr.cells[5].innerText, // APPROVAL
+                tr.cells[6].innerText, // REPAIR
+                tr.cells[7].innerText, // TODAY
+                tr.cells[8].innerText, // DAYS APP
+                tr.cells[9].innerText  // DAYS REP
+            ];
+            stats.push(rowData);
+        }
+    });
+
+    // 3. I-convert ang Array tungo sa Excel Worksheet
+    const ws = XLSX.utils.aoa_to_sheet(stats);
+    
+    // Auto-adjust column width (Optional para maganda tingnan)
+    const wscols = [
+        {wch:5}, {wch:15}, {wch:10}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:10}, {wch:10}
+    ];
+    ws['!cols'] = wscols;
+
+    const wb = XLSX.utils.book_new(); 
+    XLSX.utils.book_append_sheet(wb, ws, currentLine);
+
+    // 4. I-download ang file
+    XLSX.writeFile(wb, `${currentLine}_Filtered_Report.xlsx`);
+}
+
+        function exportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+            doc.setFontSize(18); 
+            doc.text(`MnR Productivity Report: ${currentLine}`, 14, 15);
+            
+            doc.setFontSize(9); 
+            doc.setFillColor(240, 240, 240); 
+            doc.rect(14, 20, 269, 25, 'F'); // Bahagyang pinalaki ang box para sa extra stats
+            
+            // Updated summary string kasama ang percentages
+            const row1 = `Total Approved: ${document.getElementById('dash-app').innerText} | Total Repaired: ${document.getElementById('dash-rep').innerText} | Remaining Approved: ${document.getElementById('dash-rem-app').innerText} | Remaining Pending: ${document.getElementById('dash-rem-pend').innerText}`;
+            const row2 = `Total Damage: ${document.getElementById('dash-damage').innerText} (${document.getElementById('perc-damage').innerText}) | Total Available: ${document.getElementById('manual-avail').value} (${document.getElementById('perc-avail').innerText})`;
+            
+            doc.text(row1, 20, 28);
+            doc.text(row2, 20, 36);
+
+            const rows = [];
+            document.querySelectorAll(`#body-${currentLine} tr`).forEach(tr => {
+                if (tr.style.display !== 'none') {
+                    // Start from index 1 to skip checkbox
+                    const cells = Array.from(tr.cells).slice(1).map(c => c.innerText);
+                    if (cells[1].trim()) rows.push(cells);
+                }
+            });
+            
+            doc.autoTable({ 
+                head: [["NO.", "CNTR NO.", "LINE", "EOR DATE", "APPROVAL", "REPAIR", "TODAY", "No. of Days to Approved", "No. of Days to Repaired"]], 
+                body: rows, 
+                startY: 50, 
+                theme: 'grid', 
+                styles: { fontSize: 8 } 
+            });
+            doc.save(`${currentLine}_Report.pdf`);
+        }
+    </script>
+</body>
+</html>
