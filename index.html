@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MNR Productivity System - Dynamic Filtering</title>
+    <title>MNR Productivity System - Freeze Aging Logic</title>
     
-    <!-- External Libraries for Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -41,14 +40,15 @@
         .filter-bar select { padding: 4px; border-radius: 4px; border: 1px solid #ccc; }
 
         .table-wrapper { overflow-x: auto; max-height: 500px; border: 1px solid #ddd; }
-        table { border-collapse: collapse; width: 100%; min-width: 1000px; }
+        table { border-collapse: collapse; width: 100%; min-width: 1200px; }
         th, td { border: 1px solid #ccc; padding: 8px; font-size: 12px; text-align: center; }
         th { background-color: #fce4ad; position: sticky; top: 0; z-index: 10; }
         td[contenteditable="true"] { background: white; outline: none; cursor: cell; }
         td[contenteditable="true"]:focus { background: #fffde7; box-shadow: inset 0 0 5px rgba(0,0,0,0.1); }
         td.selected { background-color: #e1f5fe !important; box-shadow: inset 0 0 0 2px #03a9f4; }
+        
         .readonly { background-color: #f9f9f9; color: #7f8c8d; }
-
+        .col-aging { background-color: #fff0f0 !important; color: #c0392b; font-weight: bold; }
         .col-days-app { background-color: #daeef3 !important; color: #0070c0; font-weight: bold; }
         .col-days-rep { background-color: #fde9d9 !important; color: #e26b0a; font-weight: bold; }
 
@@ -63,7 +63,6 @@
 </head>
 <body>
 
-    <!-- Login Section -->
     <div id="login-overlay">
         <div class="login-box">
             <h2 style="margin-bottom:20px;">MNR LOGIN</h2>
@@ -74,14 +73,12 @@
         </div>
     </div>
 
-    <!-- Main System -->
     <div id="main-system">
         <div class="header">
             <h2>MNR PRODUCTIVITY REPORT</h2>
             <button class="btn btn-logout" onclick="location.reload()">Logout</button>
         </div>
 
-        <!-- Dashboard -->
         <div class="dashboard">
             <div class="stat-box approved"><h4>Approved (Filtered)</h4><div class="value" id="dash-app">0</div></div>
             <div class="stat-box repaired"><h4>Repaired (Filtered)</h4><div class="value" id="dash-rep">0</div></div>
@@ -98,7 +95,6 @@
             </div>
         </div>
 
-        <!-- Tabs -->
         <div class="tab-bar">
             <div class="tab active" onclick="switchTab('MAERSK', this)">MAERSK</div>
             <div class="tab" onclick="switchTab('ONE', this)">ONE</div>
@@ -110,7 +106,6 @@
                 <button class="btn btn-add" onclick="addNewRows(15)">+ Add 15 Rows</button>
                 <button class="btn btn-delete" onclick="deleteSelectedRows()">🗑 Delete</button>
                 
-                <!-- Filter Bar -->
                 <div class="filter-bar">
                     <strong>FILTER:</strong>
                     <select id="filter-type" onchange="applyFilters()">
@@ -121,12 +116,12 @@
                     <select id="filter-month" onchange="applyFilters()">
                         <option value="">MONTH</option>
                         <option value="EMPTY">[BLANK]</option>
-                        <option value="01">01 (Jan)</option><option value="02">02 (Feb)</option>
-                        <option value="03">03 (Mar)</option><option value="04">04 (Apr)</option>
-                        <option value="05">05 (May)</option><option value="06">06 (Jun)</option>
-                        <option value="07">07 (Jul)</option><option value="08">08 (Aug)</option>
-                        <option value="09">09 (Sep)</option><option value="10">10 (Oct)</option>
-                        <option value="11">11 (Nov)</option><option value="12">12 (Dec)</option>
+                        <option value="01">01</option><option value="02">02</option>
+                        <option value="03">03</option><option value="04">04</option>
+                        <option value="05">05</option><option value="06">06</option>
+                        <option value="07">07</option><option value="08">08</option>
+                        <option value="09">09</option><option value="10">10</option>
+                        <option value="11">11</option><option value="12">12</option>
                     </select>
                     <select id="filter-year" onchange="applyFilters()">
                         <option value="">YEAR</option>
@@ -173,7 +168,9 @@
                                 <th><input type="checkbox" onclick="toggleAll(this, '${line}')"></th>
                                 <th>NO.</th><th>CNTR NO.</th><th>LINE</th><th>EOR DATE</th>
                                 <th>APPROVAL</th><th>REPAIR</th><th>TODAY</th>
-                                <th class="col-days-app">No. of Days to Approved</th><th class="col-days-rep">No. of Days to Repaired</th>
+                                <th class="col-aging">AGING (Status)</th>
+                                <th class="col-days-app">Days to Approved</th>
+                                <th class="col-days-rep">Days to Repaired</th>
                             </tr>
                         </thead>
                         <tbody id="body-${line}"></tbody>
@@ -184,7 +181,7 @@
         function createRow(line, data = null) {
             const tbody = document.getElementById(`body-${line}`);
             const tr = document.createElement('tr');
-            const today = new Date().toLocaleDateString('en-GB', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+            const todayStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, '-');
             
             tr.innerHTML = `
                 <td><input type="checkbox" class="row-check"></td>
@@ -194,7 +191,8 @@
                 <td contenteditable="true">${data ? data[1] : ''}</td>
                 <td contenteditable="true">${data ? data[2] : ''}</td>
                 <td contenteditable="true">${data ? data[3] : ''}</td>
-                <td class="readonly">${today}</td>
+                <td class="readonly">${todayStr}</td>
+                <td class="readonly col-aging"></td>
                 <td class="readonly col-days-app"></td>
                 <td class="readonly col-days-rep"></td>`;
 
@@ -211,8 +209,6 @@
             });
             tbody.appendChild(tr);
         }
-
-        function initRows(line, count) { for (let i = 0; i < count; i++) createRow(line); renumberRows(line); }
 
         function renumberRows(line) {
             document.querySelectorAll(`#body-${line} tr`).forEach((row, idx) => {
@@ -242,132 +238,142 @@
         function clearSelection() { document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected')); }
         window.onmouseup = () => isMouseDown = false;
 
-        document.onpaste = (e) => {
+document.onpaste = (e) => {
             const selected = document.querySelectorAll('.selected');
             if (!selected.length) return;
+            
             e.preventDefault();
             const rawData = (e.clipboardData || window.clipboardData).getData('text');
             const rows = rawData.split(/\r?\n/).filter(r => r.trim() !== "");
 
-            if (rows.length === 1 && !rawData.includes('\t') && selected.length > 1) {
-                selected.forEach(cell => { if (cell.getAttribute('contenteditable')) cell.innerText = rawData.trim(); });
-            } else {
+            // --- MULTI-PASTE LOGIC START ---
+            // Kung marami kang piniling cells (drag select) pero iisang cell lang ang kinopya mo
+            if (selected.length > 1 && rows.length === 1 && !rows[0].includes('\t')) {
+                const valueToPaste = rows[0].trim();
+                selected.forEach(cell => {
+                    if (cell.getAttribute('contenteditable')) {
+                        cell.innerText = valueToPaste;
+                    }
+                });
+            } 
+            // Standard paste (dating logic para sa maramihang data galing excel)
+            else {
                 const table = selected[0].closest('table');
                 let sRow = selected[0].parentElement.rowIndex, sCol = selected[0].cellIndex;
+
                 rows.forEach((rText, rIdx) => {
                     let tRow = table.rows[sRow + rIdx];
-                    if (!tRow) { createRow(currentLine); tRow = table.rows[sRow + rIdx]; renumberRows(currentLine); }
+                    if (!tRow) { 
+                        createRow(currentLine); 
+                        tRow = table.rows[sRow + rIdx]; 
+                        renumberRows(currentLine); 
+                    }
                     rText.split('\t').forEach((cText, cIdx) => {
                         let tCell = tRow.cells[sCol + cIdx];
                         if (tCell && tCell.getAttribute('contenteditable')) tCell.innerText = cText.trim();
                     });
                 });
             }
+            // --- MULTI-PASTE LOGIC END ---
+
             updateStats(); saveData();
         };
 
-        // --- UPDATED STATS LOGIC (DEPENDENT ON FILTER) ---
-function updateStats() {
-            const tbody = document.getElementById(`body-${currentLine}`), 
-                  rows = tbody.querySelectorAll('tr');
+        // --- IMPROVED CALCULATION LOGIC ---
+        function updateStats() {
+            const tbody = document.getElementById(`body-${currentLine}`), rows = tbody.querySelectorAll('tr');
             let app = 0, rep = 0, remA = 0, remP = 0, dmg = 0;
+            
+            const today = new Date();
+            today.setHours(0,0,0,0);
 
             rows.forEach(row => {
-                // 1. IMPORTANTE: Laktawan ang calculation kung ang row ay tago (filtered out)
                 if (row.style.display === 'none') return;
 
                 const cntr = row.cells[2].innerText.trim();
-                const dStr = row.cells[4].innerText.trim(); // EOR Date
-                const aStr = row.cells[5].innerText.trim(); // Approval Date
-                const cStr = row.cells[6].innerText.trim(); // Repair Date
-                
+                const eorStr = row.cells[4].innerText.trim();
+                const appStr = row.cells[5].innerText.trim();
+                const repStr = row.cells[6].innerText.trim();
+
                 const parseDate = (str) => {
                     const p = str.split(/[-/ ]+/);
                     if(p.length < 3) return new Date(NaN);
-                    return new Date(`20${p[2]}-${p[0]}-${p[1]}`); 
+                    let yy = p[2].length === 2 ? "20" + p[2] : p[2];
+                    return new Date(`${yy}-${p[0]}-${p[1]}`); 
                 };
 
-                const dEor = parseDate(dStr), aEor = parseDate(aStr), cRep = parseDate(cStr);
-                const diff = (d1, d2) => (isNaN(d1) || isNaN(d2)) ? "" : Math.ceil((d1 - d2) / 86400000);
-                
-                // I-update ang Days calculation (UI only)
-                row.cells[8].innerText = diff(aEor, dEor);
-                row.cells[9].innerText = diff(cRep, aEor);
+                const dEor = parseDate(eorStr), dA = parseDate(appStr), dR = parseDate(repStr);
+                const diffFunc = (d1, d2) => (isNaN(d1) || isNaN(d2)) ? null : Math.floor((d1 - d2) / 86400000) + 1;
 
-                // 2. COUNTING LOGIC: Dito nagaganap ang SUM ng approved na "naka-show"
+                // --- NEW AGING FREEZE LOGIC ---
+                if (cntr && !isNaN(dEor)) {
+                    if (isNaN(dA)) {
+                        // Wala pang approval: Bilang pa rin (Today - EOR)
+                        const liveAging = diffFunc(today, dEor);
+                        row.cells[8].innerText = (liveAging && liveAging > 0) ? liveAging : 1;
+                        row.cells[8].style.color = "#c0392b"; // Red habang pending
+                    } else {
+                        // MERON NANG APPROVAL: Titigil ang bilang sa (App Date - EOR)
+                        const finalAging = diffFunc(dA, dEor);
+                        row.cells[8].innerText = finalAging + " (Done)";
+                        row.cells[8].style.color = "#27ae60"; // Green pag tapos na
+                    }
+                } else {
+                    row.cells[8].innerText = ""; 
+                }
+
+                const diffResult = (d1, d2) => (isNaN(d1) || isNaN(d2)) ? "" : Math.floor((d1 - d2) / 86400000) + 1;
+                row.cells[9].innerText = diffResult(dA, dEor);
+                row.cells[10].innerText = diffResult(dR, dA);
+
                 if (cntr) {
-                    dmg++; // Bilang ng lahat ng may Container No. na visible
-                    
-                    if (aStr !== "" && !isNaN(aEor)) { 
-                        app++; // Ito ang SUM ng lahat ng Approved sa filtered view
-                    }
-                    
-                    if (cStr !== "" && !isNaN(cRep)) {
-                        rep++; // SUM ng Repaired sa filtered view
-                    }
-
-                    // Remaining Approved (May approval pero wala pang repair date)
-                    if (aStr !== "" && !isNaN(aEor) && (cStr === "" || isNaN(cRep))) {
-                        remA++;
-                    }
-
-                    // Remaining Pending (May EOR date pero wala pang approval)
-                    if (dStr !== "" && !isNaN(dEor) && (aStr === "" || isNaN(aEor))) {
-                        remP++;
-                    }
+                    dmg++;
+                    if (appStr !== "" && !isNaN(dA)) app++;
+                    if (repStr !== "" && !isNaN(dR)) rep++;
+                    if (appStr !== "" && !isNaN(dA) && (repStr === "" || isNaN(dR))) remA++;
+                    if (eorStr !== "" && !isNaN(dEor) && (appStr === "" || isNaN(dA))) remP++;
                 }
             });
 
-            // Update Dashboard UI
             const manual = parseInt(document.getElementById('manual-avail').value) || 0;
             const total = dmg + manual;
-            
             document.getElementById('dash-app').innerText = app;
             document.getElementById('dash-rep').innerText = rep;
             document.getElementById('dash-rem-app').innerText = remA;
             document.getElementById('dash-rem-pend').innerText = remP;
             document.getElementById('dash-damage').innerText = dmg;
-            
             document.getElementById('perc-damage').innerText = total > 0 ? ((dmg/total)*100).toFixed(1) + "%" : "0%";
             document.getElementById('perc-avail').innerText = total > 0 ? ((manual/total)*100).toFixed(1) + "%" : "0%";
         }
 
-function applyFilters() {
-    const colIndex = parseInt(document.getElementById('filter-type').value);
-    const selMonth = document.getElementById('filter-month').value;
-    const selYear = document.getElementById('filter-year').value;
-    const rows = document.querySelectorAll(`#body-${currentLine} tr`);
+        function applyFilters() {
+            const colIdx = parseInt(document.getElementById('filter-type').value);
+            const sMonth = document.getElementById('filter-month').value;
+            const sYear = document.getElementById('filter-year').value;
+            const rows = document.querySelectorAll(`#body-${currentLine} tr`);
 
-    // KUNG BLANK ANG FILTERS, ITAGO LAHAT
-    if (selMonth === "" && selYear === "") {
-        rows.forEach(row => row.style.display = "none");
-        updateStats();
-        return;
-    }
-
-    rows.forEach(row => {
-        const cntrNo = row.cells[2].innerText.trim();
-        const dateText = row.cells[colIndex].innerText.trim();
-        let showRow = false; // Default to false
-
-        if (cntrNo) {
-            if (selMonth === "EMPTY") {
-                showRow = (dateText === "");
-            } else {
-                const parts = dateText.split(/[-/ ]+/); 
-                const rowMonth = parts[0] ? parts[0].padStart(2, '0') : "";
-                const rowYear = parts[2] ? parts[2].slice(-2) : "";
-                
-                const monthMatch = (selMonth === "") || (rowMonth === selMonth);
-                const yearMatch = (selYear === "") || (rowYear === selYear);
-                
-                showRow = monthMatch && yearMatch;
+            if (sMonth === "" && sYear === "") {
+                rows.forEach((row, i) => row.style.display = i < 15 ? "" : "none");
+                updateStats(); return;
             }
+
+            rows.forEach(row => {
+                const cntr = row.cells[2].innerText.trim();
+                const dTxt = row.cells[colIdx].innerText.trim();
+                let show = false;
+                if (cntr) {
+                    if (sMonth === "EMPTY") { show = (dTxt === ""); }
+                    else {
+                        const p = dTxt.split(/[-/ ]+/);
+                        const rM = p[0] ? p[0].padStart(2,'0') : "";
+                        const rY = p[2] ? p[2].slice(-2) : "";
+                        show = ((sMonth === "" || rM === sMonth) && (sYear === "" || rY === sYear));
+                    }
+                }
+                row.style.display = show ? "" : "none";
+            });
+            updateStats();
         }
-        row.style.display = showRow ? "" : "none";
-    });
-    updateStats();
-}
 
         function clearFilters() {
             document.getElementById('filter-month').value = "";
@@ -376,95 +382,56 @@ function applyFilters() {
         }
 
         function saveData() {
-            const allData = {};
+            const all = {};
             ['MAERSK', 'ONE', 'CMA'].forEach(line => {
-                const rows = [];
+                const rs = [];
                 document.querySelectorAll(`#body-${line} tr`).forEach(tr => {
-                    const rowData = [tr.cells[2].innerText, tr.cells[4].innerText, tr.cells[5].innerText, tr.cells[6].innerText];
-                    if (rowData.some(t => t.trim() !== "")) rows.push(rowData);
+                    const d = [tr.cells[2].innerText, tr.cells[4].innerText, tr.cells[5].innerText, tr.cells[6].innerText];
+                    if (d.some(v => v.trim() !== "")) rs.push(d);
                 });
-                allData[line] = rows;
+                all[line] = rs;
             });
-            localStorage.setItem('mnr_data_v2', JSON.stringify(allData));
-            localStorage.setItem('mnr_avail_v2', document.getElementById('manual-avail').value);
+            localStorage.setItem('mnr_data_freeze', JSON.stringify(all));
+            localStorage.setItem('mnr_avail_freeze', document.getElementById('manual-avail').value);
         }
 
-function loadData() {
-    const saved = localStorage.getItem('mnr_data_v2');
-    const avail = localStorage.getItem('mnr_avail_v2');
-    if (avail) document.getElementById('manual-avail').value = avail;
-    
-    ['MAERSK', 'ONE', 'CMA'].forEach(line => {
-        const tbody = document.getElementById(`body-${line}`);
-        tbody.innerHTML = "";
-        
-        if (saved) {
-            const data = JSON.parse(saved)[line] || [];
-            // I-load ang mga saved data
-            data.forEach(rowData => createRow(line, rowData));
-            // Siguraduhin na may minimum na 15 rows
-            if (data.length < 15) {
-                initRows(line, 15 - data.length);
+        function loadData() {
+            const s = localStorage.getItem('mnr_data_freeze'), a = localStorage.getItem('mnr_avail_freeze');
+            if (a) document.getElementById('manual-avail').value = a;
+            ['MAERSK', 'ONE', 'CMA'].forEach(line => {
+                const tb = document.getElementById(`body-${line}`); tb.innerHTML = "";
+                if (s) {
+                    const d = JSON.parse(s)[line] || [];
+                    d.forEach(r => createRow(line, r));
+                    if (d.length < 15) for(let i=0; i<(15-d.length); i++) createRow(line);
+                } else { for(let i=0; i<15; i++) createRow(line); }
+                renumberRows(line);
+                tb.querySelectorAll('tr').forEach((r, i) => r.style.display = i < 15 ? '' : 'none');
+            });
+            updateStats();
+        }
+
+        function addNewRows(n) { for(let i=0; i<n; i++) createRow(currentLine); renumberRows(currentLine); updateStats(); }
+
+        function deleteSelectedRows() {
+            const cbs = Array.from(document.querySelectorAll(`#body-${currentLine} .row-check:checked`)).filter(c => c.closest('tr').style.display !== 'none');
+            if (!cbs.length) return alert("Select rows first.");
+            if (confirm("Delete selected rows?")) {
+                cbs.forEach(c => c.closest('tr').remove());
+                renumberRows(currentLine); updateStats(); saveData();
             }
-        } else {
-            // Kung fresh start, 15 rows agad
-            initRows(line, 15);
         }
 
-        // SIGURADUHIN NA MAY NUMBERING:
-        renumberRows(line);
-
-        // INITIAL VIEW: Ipakita lang ang index 0-14 (1st 15 rows)
-        const rows = tbody.querySelectorAll('tr');
-        rows.forEach((row, index) => {
-            if (index < 15) {
-                row.style.display = ''; 
-            } else {
-                row.style.display = 'none';
-            }
-        });
-    });
-    
-    // I-reset ang filter selection sa UI
-    document.getElementById('filter-month').value = "";
-    document.getElementById('filter-year').value = "";
-    
-    updateStats(); 
-}
-
-        function addNewRows(n) { initRows(currentLine, n); updateStats(); }
-
-function deleteSelectedRows() {
-    // Kukunin lang natin ang mga checkboxes na naka-check 
-    // AT ang row nila ay kasalukuyang NAKAPAKITA (style.display !== 'none')
-    const allChecked = document.querySelectorAll(`#body-${currentLine} .row-check:checked`);
-    const visibleChecked = Array.from(allChecked).filter(cb => {
-        return cb.closest('tr').style.display !== 'none';
-    });
-
-    if (visibleChecked.length === 0) {
-        alert("No visible rows selected to delete.");
-        return;
-    }
-
-    if (confirm(`Delete ${visibleChecked.length} visible rows?`)) {
-        visibleChecked.forEach(cb => cb.closest('tr').remove());
-        renumberRows(currentLine); 
-        updateStats(); 
-        saveData();
-    }
-}
-
-function toggleAll(master, line) {
-    document.querySelectorAll(`#body-${line} tr`).forEach(row => {
-        // I-check o i-uncheck lang ang row kung ito ay NAKASHOW
-        if (row.style.display !== 'none') {
-            const cb = row.querySelector('.row-check');
-            if (cb) cb.checked = master.checked;
+        function toggleAll(m, l) {
+            document.querySelectorAll(`#body-${l} tr`).forEach(r => {
+                if (r.style.display !== 'none') {
+                    const c = r.querySelector('.row-check');
+                    if (c) c.checked = m.checked;
+                }
+            });
         }
-    });
-}
-function exportExcel() {
+
+        function exportExcel() {
     // 1. Kunin ang Stats para sa Header ng Excel
     const stats = [
         ["MNR PRODUCTIVITY SUMMARY REPORT - " + currentLine],
@@ -473,7 +440,7 @@ function exportExcel() {
         ["Repaired Count:", document.getElementById('dash-rep').innerText],
         ["Total Damage:", document.getElementById('dash-damage').innerText],
         [""], // Blank space
-        ["NO.", "CNTR NO.", "LINE", "EOR DATE", "APPROVAL", "REPAIR", "TODAY", "DAYS APP", "DAYS REP"] // Headers
+        ["NO.", "CNTR NO.", "LINE", "EOR DATE", "APPROVAL", "REPAIR", "TODAY","AGING", "DAYS APP", "DAYS REP"] // Headers
     ];
 
     // 2. Kunin lang ang mga rows na NAKASHOW (Visible) at MAY LAMAN na Container No.
@@ -542,7 +509,7 @@ function exportExcel() {
             });
             
             doc.autoTable({ 
-                head: [["NO.", "CNTR NO.", "LINE", "EOR DATE", "APPROVAL", "REPAIR", "TODAY", "No. of Days to Approved", "No. of Days to Repaired"]], 
+                head: [["NO.", "CNTR NO.", "LINE", "EOR DATE", "APPROVAL", "REPAIR", "TODAY","Aging", "No. of Days to Approved", "No. of Days to Repaired"]], 
                 body: rows, 
                 startY: 50, 
                 theme: 'grid', 
