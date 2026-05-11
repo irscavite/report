@@ -315,7 +315,7 @@ document.onpaste = (e) => {
                     } else {
                         // MERON NANG APPROVAL: Titigil ang bilang sa (App Date - EOR)
                         const finalAging = diffFunc(dA, dEor);
-                        row.cells[8].innerText = finalAging + " (Done)";
+                        row.cells[8].innerText = finalAging + "";
                         row.cells[8].style.color = "#27ae60"; // Green pag tapos na
                     }
                 } else {
