@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MNR Productivity System - Freeze Aging Logic</title>
+    <title>MNR Productivity System - Integrated Control</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background-color: #f4f7f6; color: #333; }
         #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2c3e50; display: flex; justify-content: center; align-items: center; z-index: 9999; }
         .login-box { background: white; padding: 40px; border-radius: 12px; width: 350px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .login-box h2 { margin-bottom: 20px; font-style: italic; color: #2c3e50; }
         .login-box input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
         .login-box button { width: 100%; padding: 12px; background: #2980b9; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
         #main-system { display: none; padding: 20px; }
@@ -20,503 +21,620 @@
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         h2 { font-style: italic; color: #2c3e50; border-bottom: 2px solid #2c3e50; margin: 0; }
 
-        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
-        .stat-box { background: white; padding: 15px; border-radius: 8px; border-left: 5px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .stat-box h4 { margin: 0; font-size: 10px; color: #7f8c8d; text-transform: uppercase; }
-        .stat-box .value { font-size: 22px; font-weight: bold; margin: 5px 0; }
-        .stat-box .perc { font-size: 11px; color: #95a5a6; font-weight: bold; }
-        .approved { border-left-color: #27ae60; } .repaired { border-left-color: #2980b9; }
-        .rem-app { border-left-color: #f39c12; } .rem-pend { border-left-color: #e74c3c; }
-        .damage { border-left-color: #8e44ad; } .available { border-left-color: #16a085; }
+        .dashboard { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-card { background: white; padding: 15px; border-radius: 8px; min-width: 160px; flex: 1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 6px solid #ccc; display: flex; flex-direction: column; justify-content: center; }
+        .stat-card h4 { margin: 0; font-size: 11px; color: #7f8c8d; text-transform: uppercase; font-weight: 800; }
+        .stat-card .value { font-size: 28px; font-weight: bold; margin-top: 5px; display: block; color: #222; }
+        .stat-card .percent { font-size: 11px; color: #95a5a6; font-weight: bold; margin-top: -5px; }
+
+        .border-green { border-left-color: #27ae60; } .border-blue { border-left-color: #2980b9; }
+        .border-orange { border-left-color: #f39c12; } .border-red { border-left-color: #e74c3c; }
+        .border-purple { border-left-color: #8e44ad; } .border-teal { border-left-color: #16a085; }
 
         .tab-bar { display: flex; gap: 5px; }
-        .tab { padding: 10px 25px; cursor: pointer; background: #dcdde1; border-radius: 8px 8px 0 0; font-weight: bold; color: #7f8c8d; }
+        .tab { padding: 10px 25px; cursor: pointer; background: #dcdde1; border-radius: 8px 8px 0 0; font-weight: bold; color: #7f8c8d; display: none; }
         .tab.active { background: white; color: #2980b9; border-top: 4px solid #2980b9; }
 
-        .sheet-container { background: white; border: 1px solid #ccc; padding: 20px; border-radius: 0 8px 8px 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .controls-wrapper { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
-        
-        .filter-bar { display: flex; gap: 8px; align-items: center; background: #fff9c4; padding: 8px 15px; border-radius: 20px; border: 1px solid #fbc02d; font-size: 13px; }
-        .filter-bar select { padding: 4px; border-radius: 4px; border: 1px solid #ccc; }
+        .sub-tab-bar { background: white; padding: 15px; border-bottom: 1px solid #ddd; display: flex; flex-direction: column; gap: 15px; }
+        .sub-tab-top { display: flex; align-items: center; gap: 15px; width: 100%; }
 
-        .table-wrapper { overflow-x: auto; max-height: 500px; border: 1px solid #ddd; }
-        table { border-collapse: collapse; width: 100%; min-width: 1200px; }
-        th, td { border: 1px solid #ccc; padding: 8px; font-size: 12px; text-align: center; }
+        .btn-sub { padding: 8px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; background: #ecf0f1; color: #7f8c8d; transition: 0.2s; }
+        .active-dmg { background: #e74c3c !important; color: white !important; }
+        .active-av { background: #16a085 !important; color: white !important; }
+
+        .filter-container { background-color: #fff9c4; padding: 12px 20px; border-radius: 15px; border: 1px solid #ffecb3; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; }
+        .filter-group-box { display: flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.5); padding: 5px 10px; border-radius: 8px; }
+        .filter-label { font-weight: 800; font-size: 11px; color: #555; text-transform: uppercase; }
+        .filter-select, .filter-input { padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 11px; outline: none; }
+        .clear-link { color: red; font-weight: bold; cursor: pointer; font-size: 12px; margin-left: auto; }
+
+        .sheet-container { background: white; border: 1px solid #ccc; padding: 20px; border-top: none; }
+        .controls-wrapper { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; justify-content: space-between; }
+        .table-wrapper { overflow-x: auto; max-height: 600px; border: 1px solid #ddd; }
+        table { border-collapse: collapse; width: 100%; min-width: 1500px; }
+        th, td { border: 1px solid #ccc; padding: 8px; font-size: 11px; text-align: center; }
         th { background-color: #fce4ad; position: sticky; top: 0; z-index: 10; }
-        td[contenteditable="true"] { background: white; outline: none; cursor: cell; }
-        td[contenteditable="true"]:focus { background: #fffde7; box-shadow: inset 0 0 5px rgba(0,0,0,0.1); }
-        td.selected { background-color: #e1f5fe !important; box-shadow: inset 0 0 0 2px #03a9f4; }
-        
-        .readonly { background-color: #f9f9f9; color: #7f8c8d; }
-        .col-aging { background-color: #fff0f0 !important; color: #c0392b; font-weight: bold; }
-        .col-days-app { background-color: #daeef3 !important; color: #0070c0; font-weight: bold; }
-        .col-days-rep { background-color: #fde9d9 !important; color: #e26b0a; font-weight: bold; }
-
+        .date-cell { position: relative; cursor: pointer; background: white; }
+        .date-cell input[type="date"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .readonly { background-color: #f9f9f9 !important; color: #7f8c8d; }
         .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; font-size: 12px; }
         .btn-add { background: #34495e; } .btn-delete { background: #e74c3c; }
-        .btn-excel { background: #217346; } .btn-pdf { background: #c0392b; }
-        .btn-logout { background: #7f8c8d; }
+        .btn-excel { background: #217346; }
 
-        .line-pane { display: none; }
-        .line-pane.active { display: block; }
+        .admin-only { display: none; } 
+
+        /* Dagdag ito sa <style> section para sa magkadikit na buttons */
+        .export-group {
+            display: flex;
+        }
+
+        .export-group .btn-excel {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        .export-group .btn-pdf {
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+            background: #e67e22;
+        }
     </style>
 </head>
 <body>
 
     <div id="login-overlay">
         <div class="login-box">
-            <h2 style="margin-bottom:20px;">MNR LOGIN</h2>
-            <input type="text" id="username" placeholder="Username">
-            <input type="password" id="password" placeholder="Password">
+            <h2>MNR LOGIN</h2>
+            <input type="email" id="email-field" placeholder="Email Address">
+            <input type="password" id="password-field" placeholder="Password">
             <button onclick="checkLogin()">LOGIN</button>
-            <p id="error-msg" style="color:red; display:none; font-size:12px; margin-top:10px;">Invalid Username/Password!</p>
+            <p id="error-msg" style="color:red; display:none; font-size:12px; margin-top:10px;">Login Error! Check email/password.</p>
         </div>
     </div>
 
     <div id="main-system">
         <div class="header">
-            <h2>MNR PRODUCTIVITY REPORT</h2>
-            <button class="btn btn-logout" onclick="location.reload()">Logout</button>
+            <h2 id="line-title">MNR PRODUCTIVITY REPORT</h2>
+            <div>
+                <span id="user-display" style="margin-right:15px; font-weight:bold; color:#2980b9;"></span>
+                <button class="btn" style="background:#7f8c8d" onclick="location.reload()">Logout</button>
+            </div>
         </div>
 
-        <div class="dashboard">
-            <div class="stat-box approved"><h4>Approved (Total)</h4><div class="value" id="dash-app">0</div></div>
-            <div class="stat-box repaired"><h4>Repaired (Total)</h4><div class="value" id="dash-rep">0</div></div>
-            <div class="stat-box rem-app"><h4>Remaining Approved</h4><div class="value" id="dash-rem-app">0</div></div>
-            <div class="stat-box rem-pend"><h4>Remaining Pending</h4><div class="value" id="dash-rem-pend">0</div></div>
-            <div class="stat-box damage">
-                <h4>Total Damage</h4><div class="value" id="dash-damage">0</div>
-                <div class="perc" id="perc-damage">0%</div>
-            </div>
-            <div class="stat-box available">
-                <h4>Total Available</h4>
-                <input type="number" id="manual-avail" value="0" oninput="updateStats(); saveData();" style="width: 70%; border: none; font-size: 20px; font-weight: bold; outline: none; background: transparent;">
-                <div class="perc" id="perc-avail">0%</div>
-            </div>
-        </div>
+<div class="dashboard">
+    <div class="stat-card border-green"><h4>Approved (Total)</h4><div class="value" id="dash-approved">0</div></div>
+    <div class="stat-card border-blue"><h4>Repaired (Total)</h4><div class="value" id="dash-repaired">0</div></div>
+    <div class="stat-card border-orange"><h4>Remaining Approved</h4><div class="value" id="dash-rem-app">0</div></div>
+    <div class="stat-card border-red"><h4>Remaining Pending</h4><div class="value" id="dash-rem-pend">0</div></div>
+    
+    <div class="stat-card border-purple">
+        <h4>Total Damage</h4>
+        <div class="value" id="dash-total-dmg">0</div>
+        <div class="percent" id="perc-dmg">0% OF TOTAL</div>
+    </div>
+    <div class="stat-card border-teal">
+        <h4>Total Available</h4>
+        <div class="value" id="dash-total-av">0</div>
+        <div class="percent" id="perc-av">0% OF TOTAL</div>
+    </div>
+<div class="stat-card" style="border-left-color: #34495e;">
+    <h4>Grand Total Containers</h4>
+    <div class="value" id="dash-grand-total">0</div>
+    <div class="percent">DMG + AV</div>
+</div>
+</div>
 
         <div class="tab-bar">
-            <div class="tab active" onclick="switchTab('MAERSK', this)">MAERSK</div>
-            <div class="tab" onclick="switchTab('ONE', this)">ONE</div>
-            <div class="tab" onclick="switchTab('CMA', this)">CMA</div>
+            <div class="tab" id="tab-MAERSK" onclick="switchMainTab('MAERSK', this)">MAERSK</div>
+            <div class="tab" id="tab-ONE" onclick="switchMainTab('ONE', this)">ONE</div>
+            <div class="tab" id="tab-CMA" onclick="switchMainTab('CMA', this)">CMA</div>
+        </div>
+
+        <div class="sub-tab-bar">
+            <div class="sub-tab-top">
+                <strong>Category:</strong>
+                <button id="sub-all" class="btn-sub" onclick="switchSubTab('ALL')">ALL</button> <button id="sub-dmg" class="btn-sub active-dmg" onclick="switchSubTab('Damage')">DAMAGE</button>
+                <button id="sub-av" class="btn-sub" onclick="switchSubTab('Available')">AVAILABLE</button>
+                <span id="path-indicator" style="margin-left:auto; font-size:12px; color:#95a5a6;">Loading Path...</span>
+            </div>
+
+            <div class="filter-container">
+                <div class="filter-group-box"><span class="filter-label">CNTR:</span><input type="text" id="f-cntr" class="filter-input" onkeyup="applyFilters()" style="width:80px;" placeholder="Search..."></div>
+                <div class="filter-group-box">
+                    <span class="filter-label">FILTER BY:</span>
+                    <select id="f-field-type" class="filter-select" onchange="applyFilters()">
+                        <option value="4">DATE IN</option><option value="6">EOR DATE</option><option value="8">APPROVAL</option><option value="10">REPAIR</option><option value="12">DATE OUT</option>
+                    </select>
+                </div>
+                <div class="filter-group-box"><span class="filter-label">MONTH:</span><select id="f-month" class="filter-select" onchange="applyFilters()"><option value="ALL">-- ALL --</option><option value="BLANK">[BLANK / PENDING]</option></select></div>
+                <div class="filter-group-box"><span class="filter-label">YEAR:</span><select id="f-year" class="filter-select" onchange="applyFilters()"><option value="ALL">-- ALL --</option></select></div>
+                <span class="clear-link" onclick="clearFilters()">[RESET ALL]</span>
+            </div>
         </div>
 
         <div class="sheet-container">
-            <div class="controls-wrapper">
-                <button class="btn btn-add" onclick="addNewRows(15)">+ Add 15 Rows</button>
-                <button class="btn btn-delete" onclick="deleteSelectedRows()">🗑 Delete</button>
-                
-                <div class="filter-bar">
-                    <strong>FILTER:</strong>
-                    <select id="filter-type" onchange="applyFilters()">
-                        <option value="4">EOR DATE</option>
-                        <option value="5">APPROVAL</option>
-                        <option value="6">REPAIR</option>
-                    </select>
-                    <select id="filter-month" onchange="applyFilters()">
-                        <option value="">MONTH</option>
-                        <option value="EMPTY">[BLANK]</option>
-                        <option value="01">01</option><option value="02">02</option>
-                        <option value="03">03</option><option value="04">04</option>
-                        <option value="05">05</option><option value="06">06</option>
-                        <option value="07">07</option><option value="08">08</option>
-                        <option value="09">09</option><option value="10">10</option>
-                        <option value="11">11</option><option value="12">12</option>
-                    </select>
-                    <select id="filter-year" onchange="applyFilters()">
-                        <option value="">YEAR</option>
-                        <option value="24">2024</option><option value="25">2025</option><option value="26">2026</option>
-                    </select>
-                    <button onclick="clearFilters()" style="cursor:pointer; border:none; background:none; color:red; font-weight:bold;">[clear]</button>
-                </div>
+<div class="controls-wrapper">
+    <div class="admin-only" id="admin-buttons">
+        <button class="btn btn-add" onclick="addNewRows(15)">+ Add 15 Rows</button>
+        <button class="btn btn-delete" onclick="deleteSelectedRows()">🗑 Delete</button>
+    </div>
+    
+<div class="export-group">
+    <button class="btn btn-excel" onclick="exportExcel()">Export to Excel</button>
+    <button class="btn btn-pdf" onclick="exportPDF()">Export to PDF</button>
+</div>
+</div>
 
-                <div style="margin-left:auto; display:flex; gap:5px;">
-                    <button class="btn btn-excel" onclick="exportExcel()">Export Excel</button>
-                    <button class="btn btn-pdf" onclick="exportPDF()">Export PDF</button>
-                </div>
+            <div class="table-wrapper">
+                <table id="data-table">
+                    <thead>
+                        <tr>
+                            <th class="admin-only"><input type="checkbox" onclick="toggleAll(this)"></th>
+                            <th>NO.</th><th>CNTR NO.</th><th>LINE</th>
+                            <th>DATE IN</th><th>No. of Days</th>
+                            <th>EOR DATE</th><th>No. of Days</th>
+                            <th>APPROVAL</th><th>No. of Days</th>
+                            <th>REPAIR</th><th>No. of Days</th>
+                            <th>DATE OUT</th><th>TODAY</th><th>REMARKS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
             </div>
-
-            <div id="MAERSK" class="line-pane active"></div>
-            <div id="ONE" class="line-pane"></div>
-            <div id="CMA" class="line-pane"></div>
         </div>
     </div>
 
-    <script>
-        let currentLine = 'MAERSK';
-        let isMouseDown = false;
-        let startCell = null;
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+    import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
 
-        function checkLogin() {
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            if(u === "admin" && p === "admin123") {
-                document.getElementById('login-overlay').style.display = 'none';
-                document.getElementById('main-system').style.display = 'block';
-                loadData();
-            } else {
-                document.getElementById('error-msg').style.display = 'block';
-            }
-        }
+    const firebaseConfig = {
+        apiKey: "AIzaSyC-xiBCDw_SZz36WrDRKHszl5GhGIidXrY",
+        authDomain: "eastern1961-e83f6.firebaseapp.com",
+        databaseURL: "https://eastern1961-e83f6-default-rtdb.firebaseio.com",
+        projectId: "eastern1961-e83f6",
+        storageBucket: "eastern1961-e83f6.firebasestorage.app",
+        messagingSenderId: "578815361363",
+        appId: "1:578815361363:web:5d4ad5b1c2cdc3631921a6"
+    };
 
-        ['MAERSK', 'ONE', 'CMA'].forEach(line => {
-            document.getElementById(line).innerHTML = `
-                <div class="table-wrapper">
-                    <table id="table-${line}">
-                        <thead>
-                            <tr>
-                                <th><input type="checkbox" onclick="toggleAll(this, '${line}')"></th>
-                                <th>NO.</th><th>CNTR NO.</th><th>LINE</th><th>EOR DATE</th>
-                                <th>APPROVAL</th><th>REPAIR</th><th>TODAY</th>
-                                <th class="col-aging">AGING (Status)</th>
-                                <th class="col-days-app">Days to Approved</th>
-                                <th class="col-days-rep">Days to Repaired</th>
-                            </tr>
-                        </thead>
-                        <tbody id="body-${line}"></tbody>
-                    </table>
-                </div>`;
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    const userAccessMap = {
+        "easternirscavite@gmail.com": "ADMIN",
+        "maersk@mnr.com": "MAERSK",
+        "one@mnr.com": "ONE",
+        "cma@mnr.com": "CMA"
+    };
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let currentUserRole = ''; 
+    let currentLine = '';
+    let currentCategory = 'Damage';
+
+    const years = ["24","25","26"];
+
+    function initFilterOptions() {
+        const monthSel = document.getElementById('f-month');
+        const yearSel = document.getElementById('f-year');
+        monthNames.forEach((m, i) => { 
+            let opt = document.createElement('option'); 
+            opt.value = String(i + 1).padStart(2, '0'); 
+            opt.innerText = m; 
+            monthSel.appendChild(opt); 
         });
+        years.forEach(y => { let opt = document.createElement('option'); opt.value = y; opt.innerText = `20${y}`; yearSel.appendChild(opt); });
+    }
+    initFilterOptions();
 
-        function createRow(line, data = null) {
-            const tbody = document.getElementById(`body-${line}`);
-            const tr = document.createElement('tr');
-            const todayStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+    const toDDMMYY = (dStr) => {
+        if (!dStr) return "";
+        const d = new Date(dStr);
+        if (isNaN(d.getTime())) return dStr;
+        return `${String(d.getDate()).padStart(2,'0')}-${monthNames[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
+    };
+
+    const toISO = (customDate) => {
+        if (!customDate || !customDate.includes('-')) return "";
+        const p = customDate.split('-');
+        const monthIndex = monthNames.indexOf(p[1]);
+        return monthIndex !== -1 ? `20${p[2]}-${String(monthIndex + 1).padStart(2,'0')}-${p[0].padStart(2,'0')}` : "";
+    };
+
+    window.checkLogin = function() {
+        const e = document.getElementById('email-field').value.toLowerCase().trim();
+        const p = document.getElementById('password-field').value;
+
+        signInWithEmailAndPassword(auth, e, p).then(() => {
+            currentUserRole = userAccessMap[e];
+            if (!currentUserRole) { auth.signOut(); return; }
+
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('main-system').style.display = 'block';
+            document.getElementById('user-display').innerText = e + (currentUserRole === "ADMIN" ? " (MAIN)" : " (VIEWER)");
+
+            if (currentUserRole === "ADMIN") {
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = "block");
+                document.querySelectorAll('.tab').forEach(t => t.style.display = "block");
+                switchMainTab('MAERSK', document.getElementById('tab-MAERSK'));
+            } else {
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = "none");
+                const allowedTab = document.getElementById(`tab-${currentUserRole}`);
+                if (allowedTab) { allowedTab.style.display = "block"; switchMainTab(currentUserRole, allowedTab); }
+            }
+        }).catch(() => { document.getElementById('error-msg').style.display = 'block'; });
+    };
+
+    window.switchMainTab = (line, el) => {
+        currentLine = line;
+        document.getElementById('line-title').innerText = `${line} PRODUCTIVITY REPORT`;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        loadData();
+    };
+
+            window.switchSubTab = (cat) => {
+                currentCategory = cat;
+                // Reset classes
+                document.getElementById('sub-all').className = 'btn-sub';
+                document.getElementById('sub-dmg').className = 'btn-sub';
+                document.getElementById('sub-av').className = 'btn-sub';
+
+                // Apply active class
+                if (cat === 'ALL') document.getElementById('sub-all').classList.add('active-av'); // Kulay teal
+                if (cat === 'Damage') document.getElementById('sub-dmg').classList.add('active-dmg'); // Kulay red
+                if (cat === 'Available') document.getElementById('sub-av').classList.add('active-av'); // Kulay teal
+
+                loadData();
+            };
+
+window.loadData = async () => {
+    const tbody = document.getElementById('table-body');
+    tbody.innerHTML = "";
+    document.getElementById('path-indicator').innerText = `${currentLine} / ${currentCategory}`;
+
+    if (currentCategory === 'ALL') {
+        const dmgSnap = await get(ref(db, `${currentLine}/Damage`));
+        const avSnap = await get(ref(db, `${currentLine}/Available`));
+        const combinedData = [...(dmgSnap.val() || []), ...(avSnap.val() || [])].filter(item => item && item.container);
+        combinedData.forEach(item => createRow(item));
+    } 
+    else {
+        onValue(ref(db, `${currentLine}/${currentCategory}`), (snap) => {
+            tbody.innerHTML = "";
+            const data = snap.val() || [];
             
-            tr.innerHTML = `
-                <td><input type="checkbox" class="row-check"></td>
-                <td class="readonly row-num"></td>
-                <td contenteditable="true">${data ? data[0] : ''}</td>
-                <td class="readonly">${line}</td>
-                <td contenteditable="true">${data ? data[1] : ''}</td>
-                <td contenteditable="true">${data ? data[2] : ''}</td>
-                <td contenteditable="true">${data ? data[3] : ''}</td>
-                <td class="readonly">${todayStr}</td>
-                <td class="readonly col-aging"></td>
-                <td class="readonly col-days-app"></td>
-                <td class="readonly col-days-rep"></td>`;
-
-            Array.from(tr.cells).forEach(cell => {
-                if (cell.getAttribute('contenteditable')) {
-                    cell.addEventListener('mousedown', e => { 
-                        isMouseDown = true; startCell = cell; 
-                        if(!e.shiftKey) clearSelection(); 
-                        cell.classList.add('selected'); 
-                    });
-                    cell.addEventListener('mouseenter', () => { if(isMouseDown) dragSelect(cell); });
-                    cell.addEventListener('input', () => { updateStats(); saveData(); });
+            data.forEach(item => {
+                if (item && item.container) {
+                    // BAGONG FILTER: Kung Available tab, ipakita lang ang WALANG Date Out
+                    if (currentCategory === 'Available' && item.dateOut.trim() !== "") {
+                        return; // Skip/Wag ipakita sa table
+                    }
+                    createRow(item);
                 }
             });
-            tbody.appendChild(tr);
-        }
 
-        function renumberRows(line) {
-            document.querySelectorAll(`#body-${line} tr`).forEach((row, idx) => {
-                row.querySelector('.row-num').innerText = idx + 1;
+            if (currentUserRole === "ADMIN") while(tbody.children.length < 15) createRow();
+            document.querySelectorAll('#table-body tr').forEach(tr => runRowCalc(tr));
+            renumber();
+            calculateLineStats();
+        }, { onlyOnce: true });
+        return;
+    }
+
+    if (currentUserRole === "ADMIN") while(tbody.children.length < 15) createRow();
+    document.querySelectorAll('#table-body tr').forEach(tr => runRowCalc(tr));
+    renumber();
+    calculateLineStats();
+};
+
+    function handlePaste(e) {
+        if (currentUserRole !== "ADMIN") return;
+        e.preventDefault();
+        const clipboardData = (e.originalEvent || e).clipboardData.getData('text/plain');
+        const rows = clipboardData.split(/\r?\n/);
+        const startCell = e.target;
+        const allRows = Array.from(document.querySelectorAll('#table-body tr'));
+        const startRowIndex = allRows.indexOf(startCell.parentElement);
+
+        rows.forEach((rowText, rowIndex) => {
+            if (rowText.trim() === "") return;
+            const columns = rowText.split(/\t/);
+            const targetRow = allRows[startRowIndex + rowIndex];
+            if (targetRow) {
+                columns.forEach((colText, colIndex) => {
+                    if (startCell.dataset.col === "0") {
+                        if (colIndex === 0) targetRow.cells[2].innerText = colText.trim();
+                        if (colIndex === 1) targetRow.cells[14].innerText = colText.trim();
+                    } else if (startCell.dataset.col === "1") {
+                        if (colIndex === 0) targetRow.cells[14].innerText = colText.trim();
+                    }
+                });
+                runRowCalc(targetRow);
+            }
+        });
+        saveData();
+    }
+
+    function createRow(data = null) {
+        const tbody = document.getElementById('table-body');
+        const tr = document.createElement('tr');
+        const isAdmin = currentUserRole === "ADMIN";
+        const editableAttr = isAdmin ? 'contenteditable="true"' : 'contenteditable="false"';
+        const today = toDDMMYY(new Date());
+
+        tr.innerHTML = `
+            <td class="admin-only" style="display:${isAdmin ? 'table-cell' : 'none'}"><input type="checkbox" class="row-check"></td>
+            <td class="readonly row-num"></td>
+            <td ${editableAttr} class="editable-cell" data-col="0">${data ? data.container : ''}</td>
+            <td class="readonly">${currentLine}</td>
+            <td class="date-cell"><span>${data ? data.dateIn : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
+            <td class="readonly"></td>
+            <td class="date-cell"><span>${data ? data.eorDate : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
+            <td class="readonly"></td>
+            <td class="date-cell"><span>${data ? data.approval : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
+            <td class="readonly"></td>
+            <td class="date-cell"><span>${data ? data.repairDate : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
+            <td class="readonly"></td>
+            <td class="date-cell"><span>${data ? data.dateOut : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
+            <td class="readonly">${today}</td>
+            <td ${editableAttr} class="editable-cell" data-col="1">${data ? data.remarks : ''}</td>`;
+
+        if (isAdmin) {
+            tr.querySelectorAll('.date-cell').forEach(cell => {
+                const span = cell.querySelector('span');
+                const input = cell.querySelector('input');
+                if(span.innerText) input.value = toISO(span.innerText);
+                cell.onclick = () => input.showPicker();
+                input.onchange = (e) => { 
+                    span.innerText = toDDMMYY(e.target.value); 
+                    runRowCalc(tr); 
+                    saveData(); 
+                };
+            });
+            tr.querySelectorAll('.editable-cell').forEach(td => {
+                td.addEventListener('paste', handlePaste);
+                td.addEventListener('blur', () => { runRowCalc(tr); saveData(); });
             });
         }
+        tbody.appendChild(tr);
+    }
 
-        function switchTab(line, btn) {
-            currentLine = line;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.line-pane').forEach(p => p.classList.remove('active'));
-            btn.classList.add('active'); 
-            document.getElementById(line).classList.add('active');
-            updateStats();
-        }
-
-        function dragSelect(cell) {
-            clearSelection();
-            const table = cell.closest('table'), r1 = startCell.parentElement.rowIndex, r2 = cell.parentElement.rowIndex, c1 = startCell.cellIndex, c2 = cell.cellIndex;
-            for (let i = Math.min(r1, r2); i <= Math.max(r1, r2); i++) {
-                for (let j = Math.min(c1, c2); j <= Math.max(c1, c2); j++) {
-                    const target = table.rows[i].cells[j];
-                    if (target && target.getAttribute('contenteditable')) target.classList.add('selected');
-                }
-            }
-        }
-        function clearSelection() { document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected')); }
-        window.onmouseup = () => isMouseDown = false;
-
-document.onpaste = (e) => {
-            const selected = document.querySelectorAll('.selected');
-            if (!selected.length) return;
-            
-            e.preventDefault();
-            const rawData = (e.clipboardData || window.clipboardData).getData('text');
-            const rows = rawData.split(/\r?\n/).filter(r => r.trim() !== "");
-
-            // --- MULTI-PASTE LOGIC START ---
-            // Kung marami kang piniling cells (drag select) pero iisang cell lang ang kinopya mo
-            if (selected.length > 1 && rows.length === 1 && !rows[0].includes('\t')) {
-                const valueToPaste = rows[0].trim();
-                selected.forEach(cell => {
-                    if (cell.getAttribute('contenteditable')) {
-                        cell.innerText = valueToPaste;
-                    }
-                });
-            } 
-            // Standard paste (dating logic para sa maramihang data galing excel)
-            else {
-                const table = selected[0].closest('table');
-                let sRow = selected[0].parentElement.rowIndex, sCol = selected[0].cellIndex;
-
-                rows.forEach((rText, rIdx) => {
-                    let tRow = table.rows[sRow + rIdx];
-                    if (!tRow) { 
-                        createRow(currentLine); 
-                        tRow = table.rows[sRow + rIdx]; 
-                        renumberRows(currentLine); 
-                    }
-                    rText.split('\t').forEach((cText, cIdx) => {
-                        let tCell = tRow.cells[sCol + cIdx];
-                        if (tCell && tCell.getAttribute('contenteditable')) tCell.innerText = cText.trim();
-                    });
-                });
-            }
-            // --- MULTI-PASTE LOGIC END ---
-
-            updateStats(); saveData();
+    // UPDATED COMPUTATION LOGIC BASE SA FORMULA MO
+    function runRowCalc(tr) {
+        const parseManual = (s) => {
+            if(!s || !s.includes('-')) return null;
+            const p = s.split('-');
+            const mIdx = monthNames.indexOf(p[1]);
+            return mIdx !== -1 ? new Date(parseInt("20"+p[2]), mIdx, parseInt(p[0])) : null;
         };
 
-        // --- IMPROVED CALCULATION LOGIC ---
-        function updateStats() {
-            const tbody = document.getElementById(`body-${currentLine}`), rows = tbody.querySelectorAll('tr');
-            let app = 0, rep = 0, remA = 0, remP = 0, dmg = 0;
-            
-            const today = new Date();
-            today.setHours(0,0,0,0);
+        const diff = (dEnd, dStart) => (dEnd && dStart) ? Math.ceil((dEnd.getTime() - dStart.getTime())/86400000) : "";
 
-            rows.forEach(row => {
-                if (row.style.display === 'none') return;
+        const dIn = parseManual(tr.cells[4].innerText);
+        const dEor = parseManual(tr.cells[6].innerText);
+        const dApp = parseManual(tr.cells[8].innerText);
+        const dRep = parseManual(tr.cells[10].innerText);
+        const dOut = parseManual(tr.cells[12].innerText);
 
-                const cntr = row.cells[2].innerText.trim();
-                const eorStr = row.cells[4].innerText.trim();
-                const appStr = row.cells[5].innerText.trim();
-                const repStr = row.cells[6].innerText.trim();
+        // 1st Column: EOR Date - Date IN
+        tr.cells[5].innerText = diff(dEor, dIn);
+        // 2nd Column: Approval - Eor Date
+        tr.cells[7].innerText = diff(dApp, dEor);
+        // 3rd Column: Repair - Approval
+        tr.cells[9].innerText = diff(dRep, dApp);
+        // 4th Column: Date out - Repair
+        tr.cells[11].innerText = diff(dOut, dRep);
+    }
 
-                const parseDate = (str) => {
-                    const p = str.split(/[-/ ]+/);
-                    if(p.length < 3) return new Date(NaN);
-                    let yy = p[2].length === 2 ? "20" + p[2] : p[2];
-                    return new Date(`${yy}-${p[0]}-${p[1]}`); 
-                };
+window.saveData = async () => {
+    if (currentUserRole !== "ADMIN") return;
+    if (currentCategory === 'ALL') {
+        alert("Cannot save changes in ALL view.");
+        loadData();
+        return;
+    }
 
-                const dEor = parseDate(eorStr), dA = parseDate(appStr), dR = parseDate(repStr);
-                const diffFunc = (d1, d2) => (isNaN(d1) || isNaN(d2)) ? null : Math.floor((d1 - d2) / 86400000) + 1;
+    const rows = [];
+    const toMoveToAvailable = [];
 
-                // --- NEW AGING FREEZE LOGIC ---
-                if (cntr && !isNaN(dEor)) {
-                    if (isNaN(dA)) {
-                        // Wala pang approval: Bilang pa rin (Today - EOR)
-                        const liveAging = diffFunc(today, dEor);
-                        row.cells[8].innerText = (liveAging && liveAging > 0) ? liveAging : 1;
-                        row.cells[8].style.color = "#c0392b"; // Red habang pending
-                    } else {
-                        // MERON NANG APPROVAL: Titigil ang bilang sa (App Date - EOR)
-                        const finalAging = diffFunc(dA, dEor);
-                        row.cells[8].innerText = finalAging + "";
-                        row.cells[8].style.color = "#27ae60"; // Green pag tapos na
-                    }
-                } else {
-                    row.cells[8].innerText = ""; 
-                }
+    document.querySelectorAll('#table-body tr').forEach(tr => {
+        const cntr = tr.cells[2].innerText.trim();
+        if(cntr) {
+            const rowData = {
+                container: cntr, 
+                dateIn: tr.cells[4].innerText, 
+                eorDate: tr.cells[6].innerText,
+                approval: tr.cells[8].innerText, 
+                repairDate: tr.cells[10].innerText,
+                dateOut: tr.cells[12].innerText, 
+                remarks: tr.cells[14].innerText
+            };
 
-                const diffResult = (d1, d2) => (isNaN(d1) || isNaN(d2)) ? "" : Math.floor((d1 - d2) / 86400000) + 1;
-                row.cells[9].innerText = diffResult(dA, dEor);
-                row.cells[10].innerText = diffResult(dR, dA);
-
-                if (cntr) {
-                    dmg++;
-                    if (appStr !== "" && !isNaN(dA)) app++;
-                    if (repStr !== "" && !isNaN(dR)) rep++;
-                    if (appStr !== "" && !isNaN(dA) && (repStr === "" || isNaN(dR))) remA++;
-                    if (eorStr !== "" && !isNaN(dEor) && (appStr === "" || isNaN(dA))) remP++;
-                }
-            });
-
-            const manual = parseInt(document.getElementById('manual-avail').value) || 0;
-            const total = dmg + manual;
-            document.getElementById('dash-app').innerText = app;
-            document.getElementById('dash-rep').innerText = rep;
-            document.getElementById('dash-rem-app').innerText = remA;
-            document.getElementById('dash-rem-pend').innerText = remP;
-            document.getElementById('dash-damage').innerText = dmg;
-            document.getElementById('perc-damage').innerText = total > 0 ? ((dmg/total)*100).toFixed(1) + "%" : "0%";
-            document.getElementById('perc-avail').innerText = total > 0 ? ((manual/total)*100).toFixed(1) + "%" : "0%";
-        }
-
-        function applyFilters() {
-            const colIdx = parseInt(document.getElementById('filter-type').value);
-            const sMonth = document.getElementById('filter-month').value;
-            const sYear = document.getElementById('filter-year').value;
-            const rows = document.querySelectorAll(`#body-${currentLine} tr`);
-
-            if (sMonth === "" && sYear === "") {
-                rows.forEach((row, i) => row.style.display = i < 15 ? "" : "none");
-                updateStats(); return;
+            // LOGIC: Kung nasa Damage at nagkaroon ng Repair Date -> Move to Available
+            if (currentCategory === 'Damage' && rowData.repairDate.trim() !== "") {
+                toMoveToAvailable.push(rowData);
+            } 
+            // LOGIC: Kung may Date Out na, hindi na natin isasama sa active category array 
+            // para "ma-archive" na siya at sa ALL view na lang makikita.
+            else if (rowData.dateOut.trim() !== "") {
+                // Do nothing/Don't push to 'rows' - it stays in the database but effectively archived
+                // Actually, to keep it in 'ALL', we keep it in its original folder but filter it out 
+                // in the 'Available' view.
+                rows.push(rowData);
             }
-
-            rows.forEach(row => {
-                const cntr = row.cells[2].innerText.trim();
-                const dTxt = row.cells[colIdx].innerText.trim();
-                let show = false;
-                if (cntr) {
-                    if (sMonth === "EMPTY") { show = (dTxt === ""); }
-                    else {
-                        const p = dTxt.split(/[-/ ]+/);
-                        const rM = p[0] ? p[0].padStart(2,'0') : "";
-                        const rY = p[2] ? p[2].slice(-2) : "";
-                        show = ((sMonth === "" || rM === sMonth) && (sYear === "" || rY === sYear));
-                    }
-                }
-                row.style.display = show ? "" : "none";
-            });
-            updateStats();
-        }
-
-        function clearFilters() {
-            document.getElementById('filter-month').value = "";
-            document.getElementById('filter-year').value = "";
-            applyFilters();
-        }
-
-        function saveData() {
-            const all = {};
-            ['MAERSK', 'ONE', 'CMA'].forEach(line => {
-                const rs = [];
-                document.querySelectorAll(`#body-${line} tr`).forEach(tr => {
-                    const d = [tr.cells[2].innerText, tr.cells[4].innerText, tr.cells[5].innerText, tr.cells[6].innerText];
-                    if (d.some(v => v.trim() !== "")) rs.push(d);
-                });
-                all[line] = rs;
-            });
-            localStorage.setItem('mnr_data_freeze', JSON.stringify(all));
-            localStorage.setItem('mnr_avail_freeze', document.getElementById('manual-avail').value);
-        }
-
-        function loadData() {
-            const s = localStorage.getItem('mnr_data_freeze'), a = localStorage.getItem('mnr_avail_freeze');
-            if (a) document.getElementById('manual-avail').value = a;
-            ['MAERSK', 'ONE', 'CMA'].forEach(line => {
-                const tb = document.getElementById(`body-${line}`); tb.innerHTML = "";
-                if (s) {
-                    const d = JSON.parse(s)[line] || [];
-                    d.forEach(r => createRow(line, r));
-                    if (d.length < 15) for(let i=0; i<(15-d.length); i++) createRow(line);
-                } else { for(let i=0; i<15; i++) createRow(line); }
-                renumberRows(line);
-                tb.querySelectorAll('tr').forEach((r, i) => r.style.display = i < 15 ? '' : 'none');
-            });
-            updateStats();
-        }
-
-        function addNewRows(n) { for(let i=0; i<n; i++) createRow(currentLine); renumberRows(currentLine); updateStats(); }
-
-        function deleteSelectedRows() {
-            const cbs = Array.from(document.querySelectorAll(`#body-${currentLine} .row-check:checked`)).filter(c => c.closest('tr').style.display !== 'none');
-            if (!cbs.length) return alert("Select rows first.");
-            if (confirm("Delete selected rows?")) {
-                cbs.forEach(c => c.closest('tr').remove());
-                renumberRows(currentLine); updateStats(); saveData();
+            else {
+                rows.push(rowData);
             }
-        }
-
-        function toggleAll(m, l) {
-            document.querySelectorAll(`#body-${l} tr`).forEach(r => {
-                if (r.style.display !== 'none') {
-                    const c = r.querySelector('.row-check');
-                    if (c) c.checked = m.checked;
-                }
-            });
-        }
-
-        function exportExcel() {
-    // 1. Kunin ang Stats para sa Header ng Excel
-    const stats = [
-        ["MNR PRODUCTIVITY SUMMARY REPORT - " + currentLine],
-        ["Date Exported:", new Date().toLocaleString()],
-        ["Approved Count:", document.getElementById('dash-app').innerText],
-        ["Repaired Count:", document.getElementById('dash-rep').innerText],
-        ["Total Damage:", document.getElementById('dash-damage').innerText],
-        [""], // Blank space
-        ["NO.", "CNTR NO.", "LINE", "EOR DATE", "APPROVAL", "REPAIR", "TODAY","AGING", "DAYS APP", "DAYS REP"] // Headers
-    ];
-
-    // 2. Kunin lang ang mga rows na NAKASHOW (Visible) at MAY LAMAN na Container No.
-    const tbody = document.getElementById(`body-${currentLine}`);
-    const rows = tbody.querySelectorAll("tr");
-
-    rows.forEach(tr => {
-        const cntrNo = tr.cells[2].innerText.trim();
-        // Check kung visible ang row AT may container number
-        if (tr.style.display !== 'none' && cntrNo !== "") {
-            const rowData = [
-                tr.cells[1].innerText, // NO.
-                cntrNo,                // CNTR NO.
-                tr.cells[3].innerText, // LINE
-                tr.cells[4].innerText, // EOR DATE
-                tr.cells[5].innerText, // APPROVAL
-                tr.cells[6].innerText, // REPAIR
-                tr.cells[7].innerText, // TODAY
-                tr.cells[8].innerText, // DAYS APP
-                tr.cells[9].innerText  // DAYS REP
-            ];
-            stats.push(rowData);
         }
     });
 
-    // 3. I-convert ang Array tungo sa Excel Worksheet
-    const ws = XLSX.utils.aoa_to_sheet(stats);
+    await set(ref(db, `${currentLine}/${currentCategory}`), rows);
     
-    // Auto-adjust column width (Optional para maganda tingnan)
-    const wscols = [
-        {wch:5}, {wch:15}, {wch:10}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:10}, {wch:10}
-    ];
-    ws['!cols'] = wscols;
+    if (toMoveToAvailable.length > 0) {
+        const avRef = ref(db, `${currentLine}/Available`);
+        const avSnap = await get(avRef);
+        let existingAv = avSnap.val() || [];
+        await set(avRef, [...existingAv, ...toMoveToAvailable]);
+        loadData();
+    }
+};
 
-    const wb = XLSX.utils.book_new(); 
-    XLSX.utils.book_append_sheet(wb, ws, currentLine);
+async function calculateLineStats() {
+    // 1. Kunin ang lahat ng rows mula sa table (para sa Live Stats)
+    const rows = Array.from(document.querySelectorAll('#table-body tr'));
+    const visibleRows = rows.filter(tr => tr.style.display !== 'none' && tr.cells[2].innerText.trim() !== "");
 
-    // 4. I-download ang file
-    XLSX.writeFile(wb, `${currentLine}_Filtered_Report.xlsx`);
+    let app = 0, rep = 0, rApp = 0, rPen = 0;
+
+    // Live computation base sa kung ano ang nakikita sa screen
+    visibleRows.forEach(tr => {
+        const hasApp = tr.cells[8].innerText.trim() !== "";  
+        const hasRep = tr.cells[10].innerText.trim() !== ""; 
+        if (hasApp) app++;
+        if (hasRep) rep++;
+        if (hasApp && !hasRep) rApp++; 
+        if (!hasApp) rPen++;
+    });
+
+    // 2. Kunin ang kabuuang data mula sa Firebase (para sa Grand Total at %)
+    const dmgSnap = await get(ref(db, `${currentLine}/Damage`));
+    const avSnap = await get(ref(db, `${currentLine}/Available`));
+    
+    const dmgList = (dmgSnap.val() || []).filter(i => i && i.container);
+    const avList = (avSnap.val() || []).filter(i => i && i.container && i.dateOut.trim() === "");
+
+    const totalDmgCount = dmgList.length;
+    const totalAvCount = avList.length;
+    const grandTotal = totalDmgCount + totalAvCount;
+
+    // Math for Percentages (Base sa kabuuang database para accurate ang proportion)
+    const percDmg = grandTotal > 0 ? ((totalDmgCount / grandTotal) * 100).toFixed(1) : 0;
+    const percAv = grandTotal > 0 ? ((totalAvCount / grandTotal) * 100).toFixed(1) : 0;
+
+    // 3. UPDATE UI
+    // Stats na sumusunod sa filter (Live)
+    document.getElementById('dash-approved').innerText = app;
+    document.getElementById('dash-repaired').innerText = rep;
+    document.getElementById('dash-rem-app').innerText = rApp;
+    document.getElementById('dash-rem-pend').innerText = rPen;
+
+    // Stats na pangkalahatan (Fixed/Overall)
+    document.getElementById('dash-total-dmg').innerText = totalDmgCount;
+    document.getElementById('perc-dmg').innerText = `${percDmg}% OF TOTAL`;
+    
+    document.getElementById('dash-total-av').innerText = totalAvCount;
+    document.getElementById('perc-av').innerText = `${percAv}% OF TOTAL`;
+
+    const grandTotalEl = document.getElementById('dash-grand-total');
+    if(grandTotalEl) grandTotalEl.innerText = grandTotal;
 }
 
-        function exportPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('l', 'mm', 'a4');
-            doc.setFontSize(18); 
-            doc.text(`MnR Productivity Report: ${currentLine}`, 14, 15);
-            
-            doc.setFontSize(9); 
-            doc.setFillColor(240, 240, 240); 
-            doc.rect(14, 20, 269, 25, 'F'); // Bahagyang pinalaki ang box para sa extra stats
-            
-            // Updated summary string kasama ang percentages
-            const row1 = `Total Approved: ${document.getElementById('dash-app').innerText} | Total Repaired: ${document.getElementById('dash-rep').innerText} | Remaining Approved: ${document.getElementById('dash-rem-app').innerText} | Remaining Pending: ${document.getElementById('dash-rem-pend').innerText}`;
-            const row2 = `Total Damage: ${document.getElementById('dash-damage').innerText} (${document.getElementById('perc-damage').innerText}) | Total Available: ${document.getElementById('manual-avail').value} (${document.getElementById('perc-avail').innerText})`;
-            
-            doc.text(row1, 20, 28);
-            doc.text(row2, 20, 36);
+    window.applyFilters = function() {
+        const searchCntr = document.getElementById('f-cntr').value.toUpperCase();
+        const colIndex = parseInt(document.getElementById('f-field-type').value);
+        const selectedMonthNum = document.getElementById('f-month').value;
+        const selectedYear = document.getElementById('f-year').value;
+        const selectedMonthLetter = selectedMonthNum !== "ALL" && selectedMonthNum !== "BLANK" ? monthNames[parseInt(selectedMonthNum)-1] : "";
 
-            const rows = [];
-            document.querySelectorAll(`#body-${currentLine} tr`).forEach(tr => {
-                if (tr.style.display !== 'none') {
-                    // Start from index 1 to skip checkbox
-                    const cells = Array.from(tr.cells).slice(1).map(c => c.innerText);
-                    if (cells[1].trim()) rows.push(cells);
-                }
-            });
-            
-            doc.autoTable({ 
-                head: [["NO.", "CNTR NO.", "LINE", "EOR DATE", "APPROVAL", "REPAIR", "TODAY","Aging", "No. of Days to Approved", "No. of Days to Repaired"]], 
-                body: rows, 
-                startY: 50, 
-                theme: 'grid', 
-                styles: { fontSize: 8 } 
-            });
-            doc.save(`${currentLine}_Report.pdf`);
+        document.querySelectorAll('#table-body tr').forEach(tr => {
+            const cntrText = tr.cells[2].innerText.toUpperCase(), dateText = tr.cells[colIndex].innerText, p = dateText.split('-'), rowMonth = p[1] || "", rowYear = p[2] || "";
+            let matchDate = (selectedMonthNum === "ALL" && selectedYear === "ALL") || 
+                            (selectedMonthNum === "BLANK" && dateText.trim() === "") || 
+                            ((selectedMonthNum === "ALL" || rowMonth === selectedMonthLetter) && (selectedYear === "ALL" || rowYear === selectedYear));
+            tr.style.display = (cntrText.includes(searchCntr) && matchDate) ? "" : "none";
+        });
+        calculateLineStats();
+    };
+
+    window.clearFilters = () => { document.getElementById('f-cntr').value = ""; document.getElementById('f-field-type').value = "4"; document.getElementById('f-month').value = "ALL"; document.getElementById('f-year').value = "ALL"; applyFilters(); };
+    window.renumber = () => document.querySelectorAll('.row-num').forEach((td, i) => td.innerText = i + 1);
+    window.addNewRows = (n) => { for(let i=0; i<n; i++) createRow(); renumber(); };
+    window.deleteSelectedRows = () => { if(confirm("Delete selected rows?")) { document.querySelectorAll('.row-check:checked').forEach(cb => cb.closest('tr').remove()); saveData(); renumber(); } };
+    window.toggleAll = (m) => document.querySelectorAll('.row-check').forEach(c => c.checked = m.checked);
+    window.exportExcel = () => { const wb = XLSX.utils.table_to_book(document.getElementById('data-table')); XLSX.writeFile(wb, `MNR_${currentLine}_${currentCategory}.xlsx`); };
+
+    window.exportPDF = function() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'pt', 'a4'); // 'l' para sa landscape dahil malapad ang table
+
+    // 1. Kuhanin ang Active Data mula sa Dashboard
+    const approved = document.getElementById('dash-approved').innerText;
+    const repaired = document.getElementById('dash-repaired').innerText;
+    const remApp = document.getElementById('dash-rem-app').innerText;
+    const remPend = document.getElementById('dash-rem-pend').innerText;
+    const totalDmg = document.getElementById('dash-total-dmg').innerText;
+    const totalAv = document.getElementById('dash-total-av').innerText;
+    const grandTotal = document.getElementById('dash-grand-total').innerText;
+
+    // 2. Title at Header ng PDF
+    doc.setFontSize(18);
+    // Sa loob ng exportPDF function, siguraduhin na ang title ay dynamic:
+    doc.text(`${currentLine} PRODUCTIVITY REPORT`, 40, 40);
+
+    doc.setFontSize(10);
+    doc.text(`Category: ${currentCategory.toUpperCase()} | Date Generated: ${new Date().toLocaleString()}`, 40, 60);
+
+    // 3. Dashboard Summary Box sa PDF
+    doc.setDrawColor(200);
+    doc.setFillColor(245, 247, 246);
+    doc.rect(40, 75, 760, 45, 'F'); // Background box para sa stats
+    
+    doc.setFontSize(9);
+    doc.setTextColor(44, 62, 80);
+    doc.text(`APPROVED: ${approved}`, 50, 100);
+    doc.text(`REPAIRED: ${repaired}`, 160, 100);
+    doc.text(`REM. APP: ${remApp}`, 270, 100);
+    doc.text(`REM. PEND: ${remPend}`, 380, 100);
+    doc.text(`TOTAL DMG: ${totalDmg}`, 490, 100);
+    doc.text(`TOTAL AV: ${totalAv}`, 600, 100);
+    doc.text(`GRAND TOTAL: ${grandTotal}`, 710, 100);
+
+    // 4. Kuhanin lang ang Visible Rows (Active Data) mula sa Table
+    const tableData = [];
+    const headers = [["NO.", "CNTR NO.", "LINE", "DATE IN", "DAYS", "EOR DATE", "DAYS", "APPROVAL", "DAYS", "REPAIR", "DAYS", "DATE OUT", "REMARKS"]];
+    
+    const rows = document.querySelectorAll("#table-body tr");
+    rows.forEach(row => {
+        if (row.style.display !== 'none' && row.cells[2].innerText.trim() !== "") {
+            const rowData = [
+                row.cells[1].innerText, // NO.
+                row.cells[2].innerText, // CNTR NO.
+                row.cells[3].innerText, // LINE
+                row.cells[4].innerText, // DATE IN
+                row.cells[5].innerText, // DAYS
+                row.cells[6].innerText, // EOR DATE
+                row.cells[7].innerText, // DAYS
+                row.cells[8].innerText, // APPROVAL
+                row.cells[9].innerText, // DAYS
+                row.cells[10].innerText, // REPAIR
+                row.cells[11].innerText, // DAYS
+                row.cells[12].innerText, // DATE OUT
+                row.cells[14].innerText  // REMARKS
+            ];
+            tableData.push(rowData);
         }
-    </script>
+    });
+
+    // 5. Generate Table gamit ang AutoTable
+    doc.autoTable({
+        head: headers,
+        body: tableData,
+        startY: 130,
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 3 },
+        headStyles: { fillColor: [252, 228, 173], textColor: [0, 0, 0], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    // 6. Save PDF
+    doc.save(`MNR_Report_${currentLine}_${currentCategory}_${new Date().toISOString().slice(0,10)}.pdf`);
+};
+
+
+</script>
 </body>
 </html>
