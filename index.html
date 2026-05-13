@@ -162,6 +162,7 @@
 <div class="export-group">
     <button class="btn btn-excel" onclick="exportExcel()">Export to Excel</button>
     <button class="btn btn-pdf" onclick="exportPDF()">Export to PDF</button>
+    <button id="admin-summary-btn" class="btn" style="background: #8e44ad; margin-left: 5px; display: none;" onclick="window.open('summary.html', '_blank')">View Summary</button>
 </div>
 </div>
 
@@ -256,15 +257,23 @@
             document.getElementById('main-system').style.display = 'block';
             document.getElementById('user-display').innerText = e + (currentUserRole === "ADMIN" ? " (MAIN)" : " (VIEWER)");
 
-            if (currentUserRole === "ADMIN") {
-                document.querySelectorAll('.admin-only').forEach(el => el.style.display = "block");
-                document.querySelectorAll('.tab').forEach(t => t.style.display = "block");
-                switchMainTab('MAERSK', document.getElementById('tab-MAERSK'));
-            } else {
-                document.querySelectorAll('.admin-only').forEach(el => el.style.display = "none");
-                const allowedTab = document.getElementById(`tab-${currentUserRole}`);
-                if (allowedTab) { allowedTab.style.display = "block"; switchMainTab(currentUserRole, allowedTab); }
-            }
+// Hanapin ang part na ito sa loob ng checkLogin()
+if (currentUserRole === "ADMIN") {
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = "block");
+    document.querySelectorAll('.tab').forEach(t => t.style.display = "block");
+    
+    // ADD THIS LINE: Ipakita ang summary button kung admin
+    document.getElementById('admin-summary-btn').style.display = "block"; 
+    
+    switchMainTab('MAERSK', document.getElementById('tab-MAERSK'));
+} else {
+    // Siguraduhin na nakatago ito sa mga LINE accounts
+    document.getElementById('admin-summary-btn').style.display = "none";
+    
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = "none");
+    const allowedTab = document.getElementById(`tab-${currentUserRole}`);
+    if (allowedTab) { allowedTab.style.display = "block"; switchMainTab(currentUserRole, allowedTab); }
+}
         }).catch(() => { document.getElementById('error-msg').style.display = 'block'; });
     };
 
