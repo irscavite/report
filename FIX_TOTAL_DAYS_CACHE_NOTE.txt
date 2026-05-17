@@ -1,8 +1,0 @@
-FIX APPLIED - TOTAL DAYS COLUMN
-
-1. TOTAL DAYS is now a numeric computed column between DATE OUT and TODAY.
-2. Formula: DATE OUT minus DATE IN. Example: DATE IN 12-May-26 and DATE OUT 17-May-26 = 5.
-3. REMARKS remains at the correct column after TODAY.
-4. Browser cache-busting was added to index.html and module imports so the browser loads the updated JavaScript files.
-
-After upload to GitHub/Firebase hosting, do a hard refresh once: Ctrl + F5.
