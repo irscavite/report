@@ -1,0 +1,5 @@
+#main-system { display: none; padding: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.sheet-container { background: white; border: 1px solid #ccc; padding: 20px; border-top: none; }
+.controls-wrapper { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; justify-content: space-between; }
+.admin-only { display: none; }
