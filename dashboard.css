@@ -1,0 +1,11 @@
+.dashboard { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.stat-card { background: white; padding: 15px; border-radius: 8px; min-width: 160px; flex: 1; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 6px solid #ccc; display: flex; flex-direction: column; justify-content: center; }
+.stat-card h4 { margin: 0; font-size: 11px; color: #7f8c8d; text-transform: uppercase; font-weight: 800; }
+.stat-card .value { font-size: 28px; font-weight: bold; margin-top: 5px; display: block; color: #222; }
+.stat-card .percent { font-size: 11px; color: #95a5a6; font-weight: bold; margin-top: -5px; }
+.border-green { border-left-color: #27ae60; }
+.border-blue { border-left-color: #2980b9; }
+.border-orange { border-left-color: #f39c12; }
+.border-red { border-left-color: #e74c3c; }
+.border-purple { border-left-color: #8e44ad; }
+.border-teal { border-left-color: #16a085; }
