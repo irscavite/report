@@ -1,0 +1,63 @@
+.btn {
+    padding: 11px 16px;
+    border: 0;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 900;
+    color: white;
+    font-size: 12px;
+    box-shadow: 0 8px 18px rgba(15, 35, 60, 0.10);
+    transition: .18s ease;
+}
+
+.btn:hover { filter: brightness(.96); transform: translateY(-1px); }
+.btn-add { background: var(--primary-dark); }
+.btn-delete { background: var(--danger); }
+.btn-excel { background: #217346; }
+.btn-pdf { background: #e67e22; }
+.export-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.export-group .btn-excel,
+.export-group .btn-pdf { border-radius: 12px; }
+
+.csv-progress-box {
+    width: 100%;
+    margin: 8px 0 14px 0;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: #f8fafc;
+    display: none;
+}
+
+.csv-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.csv-progress-track {
+    width: 100%;
+    height: 20px;
+    background: #e2e8f0;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.csv-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--success);
+    color: white;
+    text-align: center;
+    line-height: 20px;
+    font-size: 11px;
+    font-weight: 800;
+    transition: width 0.2s ease;
+}
+
+.csv-progress-details { margin-top: 7px; font-size: 12px; color: var(--muted); }
+.csv-progress-error { margin-top: 6px; font-size: 12px; color: #c0392b; font-weight: 700; white-space: pre-wrap; }
+.csv-upload-label { display: inline-block; text-align: center; user-select: none; }
