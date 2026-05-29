@@ -1,5 +1,5 @@
-import { state } from "./state.js?v=20260527statuscols";
-import { loadData } from "./table.js?v=20260527statuscols";
+import { state } from "./state.js?v=20260529viewonly";
+import { loadData } from "./table.js?v=20260529viewonly";
 
 export function switchMainTab(line, el) {
     state.currentLine = line;

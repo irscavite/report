@@ -493,14 +493,15 @@
 
             const dmgRecords = lineRecords.filter(record => record.category === "Damage");
             const avRecords = lineRecords.filter(record => record.category === "Available");
-            const combined = [...dmgRecords, ...avRecords];
 
             let pending = 0;
             let totalApproved = 0;
             let approved = 0;
             let repaired = 0;
 
-            combined.forEach(item => {
+            // Approval/repair progress applies to DAMAGE records only.
+            // Available records should not be counted as Remaining Pending.
+            dmgRecords.forEach(item => {
                 const hasApproval = !!clean(item.approval);
                 const hasRepairDate = !!clean(item.repairDate);
 

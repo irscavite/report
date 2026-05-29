@@ -65,6 +65,36 @@ td[contenteditable="true"]:focus {
 .date-cell input[type="date"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .readonly { background-color: #f8fafc !important; color: var(--muted); }
 
+
+/* Manual Date In / EOR editing: keep the text editable while retaining picker support on empty cell click */
+.manual-datein-cell,
+.manual-eor-cell {
+    min-width: 130px;
+}
+
+.manual-datein-cell .manual-date,
+.manual-eor-cell .manual-date {
+    display: inline-block;
+    min-width: 95px;
+    min-height: 18px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    position: relative;
+    z-index: 3;
+    cursor: text;
+}
+
+.manual-datein-cell .manual-date:focus,
+.manual-eor-cell .manual-date:focus {
+    outline: 2px solid rgba(37, 99, 235, .35);
+    background: #fff;
+}
+
+.manual-datein-cell input[type="date"],
+.manual-eor-cell input[type="date"] {
+    pointer-events: none;
+}
+
 /* Manual Date Out editing: keeps the cell paste/type-friendly like Excel */
 .dateout-cell {
     min-width: 130px;
@@ -126,6 +156,7 @@ td[contenteditable="true"]:focus {
 }
 
 #data-table tbody td[contenteditable="true"]:focus,
+#data-table tbody .manual-date:focus,
 #data-table tbody .manual-dateout:focus {
     background-color: #fff7cc !important;
     outline: 2px solid #2563eb !important;

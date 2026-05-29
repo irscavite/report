@@ -1,8 +1,39 @@
 import { get, onValue, ref, set } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
-import { db } from "./firebase.js?v=20260527statuscols";
-import { state } from "./state.js?v=20260527statuscols";
-import { toDDMMYY, toISO, parseManualDate, diffDays } from "./date-utils.js?v=20260527statuscols";
-import { calculateLineStats } from "./dashboard.js?v=20260527statuscols";
+import { db } from "./firebase.js?v=20260529viewonly";
+import { state } from "./state.js?v=20260529viewonly";
+import { VIEW_ONLY_ROLE, VIEW_ONLY_VISIBLE_COLUMNS } from "./constants.js?v=20260529viewonly";
+import { toDDMMYY, toISO, parseManualDate, diffDays } from "./date-utils.js?v=20260529viewonly";
+import { calculateLineStats } from "./dashboard.js?v=20260529viewonly";
+
+
+function isViewOnlyTableAccount() {
+    return state.currentUserRole === VIEW_ONLY_ROLE;
+}
+
+export function applyViewOnlyColumns() {
+    const table = document.getElementById('data-table');
+    if (!table) return;
+
+    const shouldRestrict = isViewOnlyTableAccount();
+    const allowed = new Set(VIEW_ONLY_VISIBLE_COLUMNS);
+
+    table.querySelectorAll('thead th').forEach((th, index) => {
+        th.style.display = shouldRestrict && !allowed.has(index) ? 'none' : '';
+    });
+
+    table.querySelectorAll('tbody tr').forEach(tr => {
+        Array.from(tr.cells).forEach((td, index) => {
+            td.style.display = shouldRestrict && !allowed.has(index) ? 'none' : '';
+            if (shouldRestrict) {
+                td.contentEditable = 'false';
+                td.querySelectorAll('input, select, button').forEach(control => {
+                    control.disabled = true;
+                    control.style.display = 'none';
+                });
+            }
+        });
+    });
+}
 
 function normalizeStatus(value) {
     const text = String(value || '').trim().toLowerCase();
@@ -59,6 +90,7 @@ export async function loadData() {
     document.querySelectorAll('#table-body tr').forEach(tr => runRowCalc(tr));
     renumber();
     calculateLineStats();
+    applyViewOnlyColumns();
 }
 
 export function handlePaste(e) {
@@ -102,7 +134,7 @@ export function handlePaste(e) {
 }
 
 
-function normalizeDateOutText(rawText) {
+function normalizeManualDateText(rawText) {
     const text = String(rawText || '').trim();
     if (!text) return { display: '', iso: '' };
 
@@ -135,17 +167,22 @@ function normalizeDateOutText(rawText) {
     return null;
 }
 
-function setDateOutForRow(tr, value) {
-    const normalized = normalizeDateOutText(value);
-    if (!normalized) return false;
+function setManualDateForRow(tr, cellIndex, value) {
+    const normalized = normalizeManualDateText(value);
+    if (!normalized || !tr.cells[cellIndex]) return false;
 
-    const cell = tr.cells[15];
+    const cell = tr.cells[cellIndex];
     const span = cell.querySelector('span');
     const input = cell.querySelector('input[type="date"]');
+    if (!span) return false;
     span.innerText = normalized.display;
     if (input) input.value = normalized.iso;
     runRowCalc(tr);
     return true;
+}
+
+function setDateOutForRow(tr, value) {
+    return setManualDateForRow(tr, 15, value);
 }
 
 function getCheckedRows() {
@@ -162,42 +199,81 @@ function flashButton(btn, ok, normalText) {
     }, 1200);
 }
 
-function applyDateOutPaste(startTr, text) {
+function isRowVisible(tr) {
+    return !!(tr && tr.offsetParent !== null && getComputedStyle(tr).display !== 'none' && !tr.hidden);
+}
+
+function applyManualDatePaste(startTr, cellIndex, text) {
     const lines = String(text || '')
-        .split(/\r?\n/)
-        .map(line => line.split('\t')[0].trim())
-        .filter(Boolean);
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n')
+        .map(line => line.split('\t')[0].trim());
+
+    // Remove only the extra blank line that Excel/Sheets often adds at the end.
+    while (lines.length && lines[lines.length - 1] === '') lines.pop();
 
     if (!lines.length) return false;
 
-    const checkedRows = getCheckedRows();
-    let targetRows = checkedRows.length ? checkedRows : [];
+    let targetRows = [];
 
-    if (!targetRows.length) {
+    // If one date is copied, allow applying it to all checked visible rows.
+    // If many dates are copied while search/filter is active, paste ONLY to visible searched rows.
+    const checkedRows = getCheckedRows().filter(isRowVisible);
+    if (lines.length === 1 && checkedRows.length) {
+        targetRows = checkedRows;
+    } else {
         const allRows = Array.from(document.querySelectorAll('#table-body tr'));
-        const startIndex = allRows.indexOf(startTr);
-        targetRows = lines.length === 1 ? [startTr] : allRows.slice(startIndex, startIndex + lines.length);
+        const visibleRows = allRows.filter(isRowVisible);
+        const hasHiddenRows = visibleRows.length !== allRows.length;
+        const sourceRows = hasHiddenRows ? visibleRows : allRows;
+        const startIndex = sourceRows.indexOf(startTr);
+        if (startIndex < 0) return false;
+
+        if (!hasHiddenRows) {
+            let refreshedRows = Array.from(document.querySelectorAll('#table-body tr'));
+            const refreshedStartIndex = refreshedRows.indexOf(startTr);
+            const neededRows = refreshedStartIndex + lines.length;
+            while (refreshedRows.length < neededRows) {
+                createRow();
+                refreshedRows = Array.from(document.querySelectorAll('#table-body tr'));
+            }
+            targetRows = lines.length === 1 ? [startTr] : refreshedRows.slice(refreshedStartIndex, neededRows);
+        } else {
+            // Search/filter mode: do not paste into hidden rows and do not create extra rows.
+            targetRows = lines.length === 1 ? [startTr] : sourceRows.slice(startIndex, startIndex + lines.length);
+        }
     }
 
     let changed = 0;
     targetRows.forEach((row, index) => {
         const value = lines.length === 1 ? lines[0] : lines[index];
-        if (value && setDateOutForRow(row, value)) changed++;
+        if (value && setManualDateForRow(row, cellIndex, value)) changed++;
     });
 
-    if (changed) saveData();
+    if (changed) {
+        saveData();
+        renumber();
+        calculateLineStats();
+    }
     return changed > 0;
 }
 
-function setupManualDateOutCell(cell, tr) {
-    const span = cell.querySelector('.manual-dateout');
+function applyDateOutPaste(startTr, text) {
+    return applyManualDatePaste(startTr, 15, text);
+}
+
+function setupManualDateCell(cell, tr, cellIndex) {
+    const span = cell.querySelector('span');
     const input = cell.querySelector('input[type="date"]');
+
+    if (!span) return;
 
     cell.addEventListener('paste', (e) => {
         if (e.target !== span && e.target !== input) {
             e.preventDefault();
             const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-            applyDateOutPaste(tr, text);
+            applyManualDatePaste(tr, cellIndex, text);
         }
     });
     span.addEventListener('click', (e) => e.stopPropagation());
@@ -211,7 +287,7 @@ function setupManualDateOutCell(cell, tr) {
     span.addEventListener('paste', (e) => {
         e.preventDefault();
         const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-        applyDateOutPaste(tr, text);
+        applyManualDatePaste(tr, cellIndex, text);
     });
     span.addEventListener('blur', () => {
         const text = span.innerText.trim();
@@ -221,12 +297,20 @@ function setupManualDateOutCell(cell, tr) {
             saveData();
             return;
         }
-        if (setDateOutForRow(tr, text)) saveData();
+        if (setManualDateForRow(tr, cellIndex, text)) saveData();
     });
 
     if (input) {
         input.addEventListener('click', (e) => e.stopPropagation());
+        input.addEventListener('change', (e) => {
+            setManualDateForRow(tr, cellIndex, e.target.value);
+            saveData();
+        });
     }
+}
+
+function setupManualDateOutCell(cell, tr) {
+    setupManualDateCell(cell, tr, 15);
 }
 
 export function createRow(data = null, isAll = false) {
@@ -250,15 +334,15 @@ export function createRow(data = null, isAll = false) {
         <td ${editableAttr} class="editable-cell" data-col="3">${data ? (data.class || '') : ''}</td>
         <td class="status-cell">${statusControl}</td>
         <td class="readonly">${state.currentLine}</td>
-        <td class="date-cell"><span>${data ? data.dateIn : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
+        <td class="date-cell manual-datein-cell"><span class="manual-date" ${isAdmin ? 'contenteditable="true" spellcheck="false" title="Type or paste Date In."' : ''}>${data ? data.dateIn : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
         <td class="readonly"></td>
-        <td class="date-cell"><span>${data ? data.eorDate : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
+        <td class="date-cell manual-eor-cell"><span class="manual-date" ${isAdmin ? 'contenteditable="true" spellcheck="false" title="Type or paste EOR Date."' : ''}>${data ? data.eorDate : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
         <td class="readonly"></td>
         <td class="date-cell"><span>${data ? data.approval : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
         <td class="readonly"></td>
         <td class="date-cell"><span>${data ? data.repairDate : ''}</span>${isAdmin ? '<input type="date">' : ''}</td>
         <td class="readonly"></td>
-        <td class="date-cell dateout-cell"><span class="manual-dateout" ${isAdmin ? 'contenteditable="true" spellcheck="false" title="Type or paste Date Out. Check multiple rows first to paste one date to all checked rows."' : ''}>${data ? data.dateOut : ''}</span></td>
+        <td class="date-cell dateout-cell"><span class="manual-dateout manual-date" ${isAdmin ? 'contenteditable="true" spellcheck="false" title="Type or paste Date Out. Check multiple rows first to paste one date to all checked rows."' : ''}>${data ? data.dateOut : ''}</span></td>
         <td class="readonly"></td>
         <td class="readonly">${today}</td>
         <td ${editableAttr} class="editable-cell remarks-cell" data-col="1">${data ? data.remarks : ''}</td>
@@ -273,6 +357,20 @@ export function createRow(data = null, isAll = false) {
 
             if (cell.classList.contains('dateout-cell')) {
                 setupManualDateOutCell(cell, tr);
+            } else if (cell.classList.contains('manual-datein-cell')) {
+                setupManualDateCell(cell, tr, 7);
+                cell.onclick = (e) => {
+                    if (e.target.closest('.manual-date')) return;
+                    if (input.showPicker) input.showPicker();
+                    else input.click();
+                };
+            } else if (cell.classList.contains('manual-eor-cell')) {
+                setupManualDateCell(cell, tr, 9);
+                cell.onclick = (e) => {
+                    if (e.target.closest('.manual-date')) return;
+                    if (input.showPicker) input.showPicker();
+                    else input.click();
+                };
             } else if (input) {
                 cell.onclick = () => input.showPicker();
                 input.onchange = (e) => {
@@ -302,6 +400,7 @@ export function createRow(data = null, isAll = false) {
     }
 
     tbody.appendChild(tr);
+    applyViewOnlyColumns();
 }
 
 export function runRowCalc(tr) {
